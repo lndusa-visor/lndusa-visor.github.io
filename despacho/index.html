@@ -45,6 +45,7 @@ input[type=text]{font:16px var(--body);padding:10px;border:1px solid var(--line)
 table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;white-space:nowrap;vertical-align:middle}
 th{font:600 11px var(--mono);text-transform:uppercase;color:var(--mut);background:var(--bg);position:sticky;top:0}
+td.d img{height:56px;width:auto;display:block}
 td.q img{width:56px;height:56px;display:block;image-rendering:pixelated}
 td .x{all:unset;cursor:pointer;padding:6px 10px;color:var(--bad);font-weight:700}
 .st-ok{color:var(--ok);font-weight:700}.st-warn{color:var(--warn);font-weight:700}.st-bad{color:var(--bad);font-weight:700}
@@ -131,7 +132,7 @@ const EN={'Despacho':'Shipping','Despacho de piezas':'Piece shipping',
  'FECHA':'DATE','HORA':'TIME','CAMIÓN / REMISIÓN':'TRUCK / DELIVERY NOTE','ESTADO':'STATUS','QR':'QR','#':'#','DESPACHADO':'SHIPPED','PENDIENTE':'PENDING','HOJA':'SHEET',
  'líneas':'lines','piezas':'pieces','No se encontró una lista de troquelados en ese Excel (hoja con columnas STAMP y MARK).':'No stamp list found in that Excel (sheet with STAMP and MARK columns).',
  'No se pudo abrir la cámara.':'Could not open the camera.','Escaneado':'Scanned','Total despachado':'Total shipped','Proyecto':'Project','Fecha':'Date',
- 'Lista':'List','Compartir o guardar Excel':'Share or save Excel','Abrir Excel':'Open Excel','Excel listo':'Excel ready','Si no aparece en Descargas, usa «Compartir o guardar Excel» para mandarlo por correo, Teams o WhatsApp, o guardarlo en Archivos o Drive.':'If it does not show up in Downloads, use “Share or save Excel” to send it by email, Teams or WhatsApp, or save it to Files or Drive.','Resumen':'Summary','Cuenta':'Count','línea':'line','de':'of'};
+ 'Lista':'List','DIBUJO':'DRAWING','Compartir o guardar Excel':'Share or save Excel','Abrir Excel':'Open Excel','Excel listo':'Excel ready','Si no aparece en Descargas, usa «Compartir o guardar Excel» para mandarlo por correo, Teams o WhatsApp, o guardarlo en Archivos o Drive.':'If it does not show up in Downloads, use “Share or save Excel” to send it by email, Teams or WhatsApp, or save it to Files or Drive.','Resumen':'Summary','Cuenta':'Count','línea':'line','de':'of'};
 let lang=(()=>{try{const q=new URLSearchParams(location.search).get('lang');if(q)return q==='en'?'en':'es';return localStorage.getItem('lang')==='en'?'en':'es'}catch(e){return 'es'}})();
 const t=s=>lang==='en'&&EN[s]!=null?EN[s]:s;
 function paintLang(){document.documentElement.lang=lang;document.querySelectorAll('[data-t]').forEach(e=>e.textContent=t(e.dataset.t));
@@ -141,6 +142,7 @@ document.querySelectorAll('#lang button').forEach(b=>b.onclick=()=>{lang=b.datas
 /* ---------- estado ---------- */
 const tok=s=>String(s??'').trim().replace(/[^A-Za-z0-9._~-]+/g,'_');
 const up=s=>tok(s).toUpperCase();
+const IMG=new Map();   // dibujos de la lista (se guardan en IndexedDB)
 let L=LS.get('desp:list');           // {project,name,file,headers:[...],lines:[{sheet,v:{H:val},mk,st}]}
 let S=LS.get('desp:scans')||[];       // [{ts,truck,code,li,status}]
 let truck=LS.get('desp:truck')||'';
@@ -152,7 +154,8 @@ const HDR=[['stamp',/^(STAMP|TROQUEL)/],['sno',/^(S\.?\s*NO|NO\.?$|#)/],['mark',
 const kind=h=>{const u=String(h||'').trim().toUpperCase();for(const [k,re] of HDR) if(re.test(u)) return k;return null;};
 function colIdx(ref){const m=/^([A-Z]+)/.exec(ref);let n=0;for(const c of m[1]) n=n*26+c.charCodeAt(0)-64;return n-1;}
 const tags=(doc,n)=>Array.from(doc.getElementsByTagNameNS('*',n));
-async function readXlsx(buf){
+const IMGF=new Map();
+async function readXlsx(buf){ IMGF.clear();
   const z=await JSZip.loadAsync(buf), P=new DOMParser(), xml=async p=>{const f=z.file(p);return f?P.parseFromString(await f.async('string'),'application/xml'):null;};
   const sst=[]; const ss=await xml('xl/sharedStrings.xml'); if(ss) tags(ss,'si').forEach(si=>sst.push(tags(si,'t').map(x=>x.textContent).join('')));
   const wb=await xml('xl/workbook.xml'), rel=await xml('xl/_rels/workbook.xml.rels'), R={};
@@ -166,9 +169,17 @@ async function readXlsx(buf){
         if(ty==='s') val=v?sst[+v.textContent]??'':''; else if(ty==='inlineStr') val=tags(c,'t').map(x=>x.textContent).join(''); else if(ty==='b') val=v&&v.textContent==='1';
         else if(ty==='str'||ty==='e') val=v?v.textContent:''; else val=v?(isNaN(+v.textContent)?v.textContent:+v.textContent):'';
         row[ci]=val;});});
-    out.push({name:s.getAttribute('name'),rows});}
+    const pics=[]; try{ const sp='xl/'+tg, sr=await xml(sp.replace(/([^/]+)$/,'_rels/$1.rels'));
+      if(sr) for(const rr of tags(sr,'Relationship')){ if(!/drawing$/.test(rr.getAttribute('Type'))) continue;
+        const dp=new URL(rr.getAttribute('Target'),'http://x/'+sp).pathname.slice(1), dd=await xml(dp), dr=await xml(dp.replace(/([^/]+)$/,'_rels/$1.rels')); if(!dd||!dr) continue; const M={};
+        tags(dr,'Relationship').forEach(x=>M[x.getAttribute('Id')]=new URL(x.getAttribute('Target'),'http://x/'+dp).pathname.slice(1));
+        for(const an of [...tags(dd,'oneCellAnchor'),...tags(dd,'twoCellAnchor')]){ const fr=tags(an,'from')[0], bl=tags(an,'blip')[0], ex=tags(an,'ext')[0]; if(!fr||!bl) continue;
+          const emb=bl.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','embed')||bl.getAttribute('r:embed'), mp=M[emb]; if(!mp||!z.file(mp)) continue;
+          pics.push({row:+tags(fr,'row')[0].textContent,col:+tags(fr,'col')[0].textContent,path:mp,cx:ex?+ex.getAttribute('cx'):0,cy:ex?+ex.getAttribute('cy'):0}); } } }catch(e){ console.warn('dibujos',e); }
+    for(const pc of pics){ if(!IMGF.has(pc.path)) IMGF.set(pc.path,await z.file(pc.path).async('base64')); }
+    out.push({name:s.getAttribute('name'),rows,pics});}
   return out;}
-function parseList(sheets,file){
+function parseList(sheets,file){ IMG.clear();
   let project='',name='',headers=null; const lines=[];
   sheets.forEach(sh=>{
     sh.rows.slice(0,6).forEach(r=>(r||[]).forEach(v=>{const m=/\b(US\.?\d{3}(?:\.\d+)?)\b/i.exec(String(v||''));if(m&&!project) project=m[1].toUpperCase().replace(/^US(\d)/,'US.$1');
@@ -182,15 +193,20 @@ function parseList(sheets,file){
       const mk=g('mark'); if(mk===''||mk==null){ if(String(r[0]??'').toUpperCase().startsWith('TOTAL')) break; continue; }
       if(r.some(c=>/^\s*TOTAL\b/i.test(String(c??'')))) continue;
       const v={}; H.forEach(x=>{ const target=headers.find(h=>kind(h)===x.k&&x.k)||x.h; v[target]=r[x.ci]??''; if(!headers.includes(target)) headers.push(target); });
-      const q=+g('qty'); lines.push({sheet:sh.name,v,mk:up(mk),st:up(g('stamp')),qty:isFinite(q)&&q>0?q:1,wt:+g('wt')||0,sa:+g('sa')||0});}
+      const dc=map.findIndex(h=>kind(h)==='dwg'&&/^(DRAWING|DIBUJO|PLANO)/i.test(String(h||'').trim())), pc=(sh.pics||[]).find(x=>x.row===i&&(dc<0?true:x.col===dc));
+      let img=null; if(pc){ img='i'+IMG.size; const b64=IMGF.get(pc.path); IMG.set(img,{ext:/\.jpe?g$/i.test(pc.path)?'jpeg':'png',b64,cx:pc.cx||800100,cy:pc.cy||457200}); }
+      const q=+g('qty'); lines.push({sheet:sh.name,v,mk:up(mk),st:up(g('stamp')),qty:isFinite(q)&&q>0?q:1,wt:+g('wt')||0,sa:+g('sa')||0,img});}
   });
   if(!lines.length) return null;
   return {project,name,file,headers,lines};}
 
+const IDB={db:null,open(){ return this.db||(this.db=new Promise((ok,ko)=>{ try{ const r=indexedDB.open('despacho',1); r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>ok(r.result); r.onerror=()=>ko(r.error); }catch(e){ ko(e); } })); },
+  async put(k,v){ try{ const d=await this.open(); await new Promise((ok,ko)=>{ const tx=d.transaction('kv','readwrite'); tx.objectStore('kv').put(v,k); tx.oncomplete=ok; tx.onerror=()=>ko(tx.error); }); }catch(e){ console.warn('idb',e); } },
+  async get(k){ try{ const d=await this.open(); return await new Promise((ok,ko)=>{ const r=d.transaction('kv').objectStore('kv').get(k); r.onsuccess=()=>ok(r.result); r.onerror=()=>ko(r.error); }); }catch(e){ return null; } }};
 $('file').onchange=async e=>{const f=e.target.files[0]; if(!f) return; e.target.value='';
   try{ const sh=await readXlsx(await f.arrayBuffer()); const l=parseList(sh,f.name); if(!l){ show('bad',t('No se encontró una lista de troquelados en ese Excel (hoja con columnas STAMP y MARK).')); return; }
     if(L&&S.length&&L.project!==l.project){ S=[]; save(); }
-    L=l; LS.set('desp:list',L);
+    L=l; LS.set('desp:list',L); IDB.put('imgs',[...IMG.entries()]);
     const old=S; S=[]; old.forEach(x=>{ const q=parse(x.code); let li=-1, st;
       if(q.proj&&L.project&&q.proj!==L.project) st='bad-proj'; else { li=find(q); st=li<0?'bad':(shipped(li)>=L.lines[li].qty?'warn':'ok'); }
       S.push({...x,li,status:st}); }); save(); render(); $('gun').focus();
@@ -265,9 +281,9 @@ function render(){
   $('title').textContent=[L.project,L.name].filter(Boolean).join(' · ')||t('Despacho de piezas');
   $('listInfo').textContent=`${L.file} · ${L.lines.length} ${t('líneas')} · ${fmt(pcs)} ${t('piezas')}`;
   const T=totals(); $('sN').textContent=fmt(S.filter(s=>s.status==='ok'||s.status==='warn').length); $('sL').textContent=`${T.done} / ${L.lines.length}`; $('sW').textContent=fmt(T.w); $('sS').textContent=fmt(T.a,1);
-  $('th').innerHTML='<tr>'+['#',...L.headers,t('QR'),t('ESTADO'),t('HORA'),''].map(h=>`<th>${esc(h)}</th>`).join('')+'</tr>';
+  $('th').innerHTML='<tr>'+['#',...L.headers,t('DIBUJO'),t('QR'),t('ESTADO'),t('HORA'),''].map(h=>`<th>${esc(h)}</th>`).join('')+'</tr>';
   const rows=[]; for(let i=S.length-1;i>=0&&rows.length<300;i--){ const s=S[i], l=s.li>=0?L.lines[s.li]:null;
-    rows.push(`<tr><td>${i+1}</td>${L.headers.map(h=>`<td>${esc(vals(s)[h]??'')}</td>`).join('')}<td class="q"><img alt="" src="${qrPng(s.code,112)}"></td><td class="${stCls(s.status)}">${esc(stTxt(s.status))}</td><td>${esc(new Date(s.ts).toLocaleTimeString(lang==='en'?'en-US':'es-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}))}</td><td><button class="x" type="button" data-del="${i}" aria-label="×">×</button></td></tr>`); }
+    rows.push(`<tr><td>${i+1}</td>${L.headers.map(h=>`<td>${esc(vals(s)[h]??'')}</td>`).join('')}<td class="d">${(()=>{ const l=s.li>=0?L.lines[s.li]:null, im=l&&l.img&&IMG.get(l.img); return im?`<img alt="" src="data:image/${im.ext};base64,${im.b64}">`:''; })()}</td><td class="q"><img alt="" src="${qrPng(s.code,112)}"></td><td class="${stCls(s.status)}">${esc(stTxt(s.status))}</td><td>${esc(new Date(s.ts).toLocaleTimeString(lang==='en'?'en-US':'es-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}))}</td><td><button class="x" type="button" data-del="${i}" aria-label="×">×</button></td></tr>`); }
   $('tb').innerHTML=rows.join('');
 }
 
@@ -300,28 +316,29 @@ function sheetXml(rows,{cols,heights,freeze,filter,drawing,merge}){
   if(drawing) x+='<drawing r:id="rId1"/>'; return x+'</worksheet>'; }
 async function download(){
   if(!L) return; const z=new JSZip(), now=new Date(), H=L.headers, dstr=now.toLocaleDateString(lang==='en'?'en-US':'es-US');
-  const fixed=['#',t('CAMIÓN / REMISIÓN')], hdr=[...fixed,...H,t('QR'),t('ESTADO'),t('FECHA'),t('HORA')], qrCol=fixed.length+H.length;
+  const fixed=['#',t('CAMIÓN / REMISIÓN')], hdr=[...fixed,...H,t('DIBUJO'),t('QR'),t('ESTADO'),t('FECHA'),t('HORA')], dwCol=fixed.length+H.length, qrCol=dwCol+1;
   const numK=new Set(['qty','wt','sa','sno']);
   const R=[[{v:[L.project,L.name].filter(Boolean).join(' · ')+' — '+t('DESPACHO').toUpperCase(),s:1}],[t('Fecha')+': '+dstr+(truck?'   ·   '+t('CAMIÓN / REMISIÓN')+': '+truck:'')],[],hdr.map(h=>({v:h,s:2}))];
   const hts={3:30}, pics=[], media=new Map();
   S.forEach((s,i)=>{ const l=s.li>=0?L.lines[s.li]:null, d=new Date(s.ts);
     const row=[{v:i+1,s:3},{v:s.truck||'',s:3}];
     const VV=vals(s); H.forEach(h=>{ const v=VV[h]??''; row.push({v:v===''||v==null?'':v,s:typeof v==='number'&&(kind(h)==='wt'||kind(h)==='sa')?7:3}); });
-    row.push({v:'',s:3}); row.push({v:stTxt(s.status),s:s.status==='ok'?4:s.status==='warn'?5:6});
+    row.push({v:'',s:3}); row.push({v:'',s:3}); row.push({v:stTxt(s.status),s:s.status==='ok'?4:s.status==='warn'?5:6});
     row.push({v:d.toLocaleDateString(lang==='en'?'en-US':'es-US'),s:3}); row.push({v:d.toLocaleTimeString(lang==='en'?'en-US':'es-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),s:3});
     R.push(row); const ri=R.length-1; hts[ri]=62;
-    if(!media.has(s.code)) media.set(s.code,'qr'+(media.size+1)+'.png'); pics.push({r:ri,c:qrCol,img:media.get(s.code)}); });
+    if(!media.has(s.code)) media.set(s.code,{f:'qr'+(media.size+1)+'.png',qr:s.code}); pics.push({r:ri,c:qrCol,img:media.get(s.code).f,cx:74*9525,cy:74*9525});
+    const im=l&&l.img&&IMG.get(l.img); if(im){ const k='d:'+l.img; if(!media.has(k)) media.set(k,{f:'dw'+(media.size+1)+'.'+(im.ext==='jpeg'?'jpeg':'png'),im}); const sc=Math.min(1,(180*9525)/im.cx,(74*9525)/im.cy); pics.push({r:ri,c:dwCol,img:media.get(k).f,cx:Math.round(im.cx*sc),cy:Math.round(im.cy*sc)}); } });
   // fila de totales
   let tw=0,ta=0; S.forEach(s=>{ if(s.li>=0&&s.status!=='bad-proj'){ const l=L.lines[s.li]; tw+=l.wt/(l.qty||1); ta+=l.sa/(l.qty||1); } });
   const tot=new Array(hdr.length).fill(null); tot[0]={v:t('Total despachado'),s:8}; const iw=H.findIndex(h=>kind(h)==='wt'), ia=H.findIndex(h=>kind(h)==='sa');
   if(iw>=0) tot[fixed.length+iw]={v:Math.round(tw*100)/100,s:8}; if(ia>=0) tot[fixed.length+ia]={v:Math.round(ta*100)/100,s:8};
   const iq=H.findIndex(h=>kind(h)==='qty'); tot[fixed.length+(iq>=0?iq:0)]= {v:S.filter(s=>s.status==='ok'||s.status==='warn').length,s:8}; R.push([]); R.push(tot);
   const wid=h=>{ const k=kind(h); return k==='desc'?20:k==='mark'?18:k==='len'?13:k==='tipo2'?13:k==='tipo'?14:k==='coat'?12:k==='wt'||k==='sa'?12:9; };
-  const cols=[5,16,...H.map(wid),11,18,11,12];
+  const cols=[5,16,...H.map(wid),27,11,18,11,12];
   // resumen por línea
   const RS=[[{v:[L.project,L.name].filter(Boolean).join(' · ')+' — '+t('Resumen').toUpperCase(),s:1}],[],[ t('HOJA'),...H,t('DESPACHADO'),t('PENDIENTE')].map(h=>({v:h,s:2}))];
   L.lines.forEach((l,i)=>{ const n=shipped(i), p=Math.max(0,l.qty-n); RS.push([{v:l.sheet,s:3},...H.map(h=>({v:l.v[h]??'',s:3})),{v:n,s:n>=l.qty?4:n>0?5:3},{v:p,s:p?3:4}]); });
-  z.file('[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${pics.length?'<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>':''}</Types>`);
+  z.file('[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${pics.length?'<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>':''}</Types>`);
   z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
   const n1=t('DESPACHO').toUpperCase().slice(0,31), n2=t('Resumen').toUpperCase().slice(0,31);
   z.file('xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xe(n1)}" sheetId="1" r:id="rId1"/><sheet name="${xe(n2)}" sheetId="2" r:id="rId2"/></sheets><definedNames><definedName name="_xlnm.Print_Titles" localSheetId="0">'${xe(n1)}'!$4:$4</definedName><definedName name="_xlnm.Print_Titles" localSheetId="1">'${xe(n2)}'!$3:$3</definedName></definedNames></workbook>`);
@@ -333,11 +350,11 @@ async function download(){
   if(pics.length){
     z.file('xl/worksheets/_rels/sheet1.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>');
     const ids=new Map(); let rel='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
-    media.forEach((f,code)=>{ const id='rId'+(ids.size+1); ids.set(f,id); rel+=`<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/${f}"/>`;
-      z.file('xl/media/'+f,qrPng(code,240).split(',')[1],{base64:true}); });
+    media.forEach(m=>{ const f=m.f, id='rId'+(ids.size+1); ids.set(f,id); rel+=`<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/${f}"/>`;
+      z.file('xl/media/'+f,m.qr!=null?qrPng(m.qr,240).split(',')[1]:m.im.b64,{base64:true}); });
     z.file('xl/drawings/_rels/drawing1.xml.rels',rel+'</Relationships>');
     const E=9525, sz=74*E; let dr='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
-    pics.forEach((p,i)=>{ dr+=`<xdr:oneCellAnchor><xdr:from><xdr:col>${p.c}</xdr:col><xdr:colOff>${4*E}</xdr:colOff><xdr:row>${p.r}</xdr:row><xdr:rowOff>${3*E}</xdr:rowOff></xdr:from><xdr:ext cx="${sz}" cy="${sz}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${i+2}" name="QR ${i+1}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${ids.get(p.img)}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${sz}" cy="${sz}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`; });
+    pics.forEach((p,i)=>{ dr+=`<xdr:oneCellAnchor><xdr:from><xdr:col>${p.c}</xdr:col><xdr:colOff>${4*E}</xdr:colOff><xdr:row>${p.r}</xdr:row><xdr:rowOff>${3*E}</xdr:rowOff></xdr:from><xdr:ext cx="${p.cx}" cy="${p.cy}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${i+2}" name="Pic ${i+1}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${ids.get(p.img)}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${p.cx}" cy="${p.cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`; });
     z.file('xl/drawings/drawing1.xml',dr+'</xdr:wsDr>'); }
   const blob=await z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',compression:'DEFLATE'});
   const pad=n=>String(n).padStart(2,'0'), fn=`${(L.project||'Proyecto').replace(/[^\w.-]+/g,'_')}_${t('DESPACHO').toUpperCase()}_${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.xlsx`;
@@ -351,6 +368,7 @@ EN['DESPACHO']='SHIPPING';
 $('xlsBtn').onclick=()=>download().catch(e=>show('bad',String(e.message||e)));
 window.__desp={scan,download,get L(){return L},get S(){return S}};
 paintLang();
+IDB.get('imgs').then(a=>{ if(a&&L&&!IMG.size){ a.forEach(([k,v])=>IMG.set(k,v)); render(); } });
 })();
 </script>
 </body>
