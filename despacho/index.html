@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Despacho</title>
+<style>
+:root{--bg:#eef1f3;--ink:#1d2326;--mut:#5d6a71;--card:#fff;--line:#d5dbdf;--acc:#b5532a;--top:#1d2326;
+  --ok:#1e7a46;--okb:#e3f3ea;--warn:#8a5a00;--warnb:#fdf1d6;--bad:#b3261e;--badb:#fbe4e2;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15191b;--ink:#e8ecee;--mut:#9aa6ad;--card:#1f2528;--line:#33393d;--acc:#e07a4a;
+  --ok:#5cc58a;--okb:#16301f;--warn:#e8b54a;--warnb:#33290f;--bad:#f08078;--badb:#3a1916}}
+:root[data-theme="dark"]{--bg:#15191b;--ink:#e8ecee;--mut:#9aa6ad;--card:#1f2528;--line:#33393d;--acc:#e07a4a;--ok:#5cc58a;--okb:#16301f;--warn:#e8b54a;--warnb:#33290f;--bad:#f08078;--badb:#3a1916}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 var(--body)}
+#lang{display:flex;justify-content:flex-end;align-items:center;gap:6px;padding:8px max(16px,env(safe-area-inset-right)) 8px max(16px,env(safe-area-inset-left));background:var(--top)}
+#lang span{font:500 12px/1 var(--body);color:#c9d1d4;margin-right:auto}
+#lang button{all:unset;cursor:pointer;font:600 14px/1 var(--body);padding:8px 14px;border-radius:999px;color:#fff;border:1px solid #6f7f88}
+#lang button[aria-pressed="true"]{background:#fff;color:#1d2326;border-color:#fff}
+main{max-width:920px;margin:0 auto;padding:16px}
+.eyebrow{font:600 12px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--acc);margin:4px 0}
+h1{font-size:24px;margin:0 0 4px}
+.mut{color:var(--mut);font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);padding:14px;margin:12px 0}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{all:unset;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 16px;font:600 15px var(--body);border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.big{min-height:56px;font-size:17px;flex:1 1 200px}
+.btn:disabled,.btn[aria-disabled="true"]{opacity:.45;pointer-events:none}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mut);flex:1 1 200px}
+input[type=text]{font:16px var(--body);padding:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%}
+#gun{font-family:var(--mono)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stat{background:var(--bg);padding:10px}
+.stat b{display:block;font:700 20px var(--mono)}
+.stat span{font-size:12px;color:var(--mut)}
+@media (max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}}
+#msg{display:none;padding:14px;border:2px solid;margin:12px 0;font-weight:600}
+#msg.ok{display:block;color:var(--ok);background:var(--okb);border-color:var(--ok)}
+#msg.warn{display:block;color:var(--warn);background:var(--warnb);border-color:var(--warn)}
+#msg.bad{display:block;color:var(--bad);background:var(--badb);border-color:var(--bad)}
+#msg small{display:block;font-weight:400;color:var(--ink);margin-top:4px;font-family:var(--mono);word-break:break-all}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;white-space:nowrap;vertical-align:middle}
+th{font:600 11px var(--mono);text-transform:uppercase;color:var(--mut);background:var(--bg);position:sticky;top:0}
+td.q img{width:56px;height:56px;display:block;image-rendering:pixelated}
+td .x{all:unset;cursor:pointer;padding:6px 10px;color:var(--bad);font-weight:700}
+.st-ok{color:var(--ok);font-weight:700}.st-warn{color:var(--warn);font-weight:700}.st-bad{color:var(--bad);font-weight:700}
+#cam{position:fixed;inset:0;background:#000;z-index:100;display:none;flex-direction:column}
+#cam.on{display:flex}
+#cam video{flex:1;width:100%;object-fit:cover;min-height:0}
+#cam .bar{display:flex;gap:10px;padding:12px max(16px,env(safe-area-inset-left)) max(16px,env(safe-area-inset-bottom));background:#111}
+#cam .frame{position:absolute;left:50%;top:42%;width:min(70vw,320px);aspect-ratio:1;transform:translate(-50%,-50%);border:3px solid rgba(255,255,255,.85);box-shadow:0 0 0 9999px rgba(0,0,0,.35);pointer-events:none}
+#camMsg{position:absolute;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top));padding:12px;font-weight:700;text-align:center;display:none;color:#fff}
+#camMsg.ok{display:block;background:#1e7a46}#camMsg.warn{display:block;background:#8a5a00}#camMsg.bad{display:block;background:#b3261e}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div id="lang"><span>Idioma · Language</span><button type="button" data-l="es">Español</button><button type="button" data-l="en">English</button></div>
+<main>
+  <p class="eyebrow">Lindsayca Manufacturing USA · <span data-t="Despacho"></span></p>
+  <h1 id="title" data-t="Despacho de piezas"></h1>
+  <p class="mut" id="sub" data-t="Carga la lista de troquelados del proyecto y escanea los QR de las piezas con la cámara o con la pistola."></p>
+
+  <section class="card" id="loadCard">
+    <div class="row">
+      <label class="btn pri big" for="file"><span data-t="Cargar lista de troquelados (Excel)"></span></label>
+      <input type="file" id="file" accept=".xlsx,.xlsm" hidden>
+    </div>
+    <p class="mut" id="listInfo" style="margin:10px 0 0"></p>
+  </section>
+
+  <section id="work" hidden>
+    <div class="card">
+      <div class="row">
+        <label class="f"><span data-t="Camión / remisión"></span><input type="text" id="truck" autocomplete="off"></label>
+        <label class="f"><span data-t="Pistola o código (Enter)"></span><input type="text" id="gun" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url"></label>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn pri big" id="camBtn" type="button" data-t="Escanear con cámara"></button>
+        <button class="btn big" id="xlsBtn" type="button" data-t="Descargar Excel"></button>
+      </div>
+    </div>
+    <div id="msg" role="status" aria-live="polite"></div>
+    <div class="card">
+      <div class="stats">
+        <div class="stat"><b id="sN">0</b><span data-t="Piezas escaneadas"></span></div>
+        <div class="stat"><b id="sL">0 / 0</b><span data-t="Líneas completas"></span></div>
+        <div class="stat"><b id="sW">0</b><span data-t="Peso (lb)"></span></div>
+        <div class="stat"><b id="sS">0</b><span data-t="Superficie (ft²)"></span></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="undo" type="button" data-t="Deshacer último"></button>
+        <button class="btn" id="clear" type="button" data-t="Nuevo despacho"></button>
+      </div>
+    </div>
+    <div class="tw"><table><thead id="th"></thead><tbody id="tb"></tbody></table></div>
+    <p class="mut" style="margin-top:8px" data-t="Los escaneos se guardan en este teléfono hasta que empieces un nuevo despacho."></p>
+  </section>
+</main>
+
+<div id="cam" aria-modal="true" role="dialog">
+  <video id="vid" playsinline muted></video>
+  <div class="frame"></div>
+  <div id="camMsg"></div>
+  <div class="bar"><button class="btn big" id="camClose" type="button" style="background:#fff;color:#111" data-t="Cerrar cámara"></button></div>
+</div>
+
+<script src="lib/jszip.min.js"></script>
+<script src="lib/jsQR.js"></script>
+<script src="lib/qrenc.js"></script>
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const LS={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+
+/* ---------- idioma ---------- */
+const EN={'Despacho':'Shipping','Despacho de piezas':'Piece shipping',
+ 'Carga la lista de troquelados del proyecto y escanea los QR de las piezas con la cámara o con la pistola.':'Load the project stamp list and scan the piece QR codes with the camera or the scanner gun.',
+ 'Cargar lista de troquelados (Excel)':'Load stamp list (Excel)','Cambiar lista de troquelados':'Change stamp list',
+ 'Camión / remisión':'Truck / delivery note','Pistola o código (Enter)':'Scanner gun or code (Enter)',
+ 'Escanear con cámara':'Scan with camera','Descargar Excel':'Download Excel','Piezas escaneadas':'Pieces scanned','Líneas completas':'Lines complete',
+ 'Peso (lb)':'Weight (lb)','Superficie (ft²)':'Surface (ft²)','Deshacer último':'Undo last','Nuevo despacho':'New shipment','Tocar otra vez para borrar todo':'Tap again to clear all',
+ 'Los escaneos se guardan en este teléfono hasta que empieces un nuevo despacho.':'Scans are saved on this phone until you start a new shipment.',
+ 'Cerrar cámara':'Close camera','OK':'OK','Ya se despacharon todas':'All already shipped','No está en la lista':'Not in the list','Otro proyecto':'Other project',
+ 'FECHA':'DATE','HORA':'TIME','CAMIÓN / REMISIÓN':'TRUCK / DELIVERY NOTE','ESTADO':'STATUS','QR':'QR','#':'#','DESPACHADO':'SHIPPED','PENDIENTE':'PENDING','HOJA':'SHEET',
+ 'líneas':'lines','piezas':'pieces','No se encontró una lista de troquelados en ese Excel (hoja con columnas STAMP y MARK).':'No stamp list found in that Excel (sheet with STAMP and MARK columns).',
+ 'No se pudo abrir la cámara.':'Could not open the camera.','Escaneado':'Scanned','Total despachado':'Total shipped','Proyecto':'Project','Fecha':'Date',
+ 'Lista':'List','Resumen':'Summary','Cuenta':'Count','línea':'line','de':'of'};
+let lang=(()=>{try{const q=new URLSearchParams(location.search).get('lang');if(q)return q==='en'?'en':'es';return localStorage.getItem('lang')==='en'?'en':'es'}catch(e){return 'es'}})();
+const t=s=>lang==='en'&&EN[s]!=null?EN[s]:s;
+function paintLang(){document.documentElement.lang=lang;document.querySelectorAll('[data-t]').forEach(e=>e.textContent=t(e.dataset.t));
+  document.querySelectorAll('#lang button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.l===lang)));document.title=t('Despacho');render();}
+document.querySelectorAll('#lang button').forEach(b=>b.onclick=()=>{lang=b.dataset.l;try{localStorage.setItem('lang',lang)}catch(e){}paintLang();});
+
+/* ---------- estado ---------- */
+const tok=s=>String(s??'').trim().replace(/[^A-Za-z0-9._~-]+/g,'_');
+const up=s=>tok(s).toUpperCase();
+let L=LS.get('desp:list');           // {project,name,file,headers:[...],lines:[{sheet,v:{H:val},mk,st}]}
+let S=LS.get('desp:scans')||[];       // [{ts,truck,code,li,status}]
+let truck=LS.get('desp:truck')||'';
+const save=()=>{LS.set('desp:scans',S);};
+
+/* ---------- leer Excel de troquelados ---------- */
+const HDR=[['stamp',/^(STAMP|TROQUEL)/],['sno',/^(S\.?\s*NO|NO\.?$|#)/],['mark',/^(MARK|MARCA)/],['qty',/^(QTY|CANT)/],['desc',/^(DESCRIP)/],
+  ['tipo2',/^(SIMPLE|WELDED|COMPU)/],['tipo',/^(TIPO|TYPE)$/],['coat',/^(COATING|GRADE|RECUBR)/],['len',/^(LENGTH|LARGO|LONG)/],['wt',/^(WEIGHT|PESO)/],['sa',/^(SURFACE|SUPERF)/],['dwg',/^(DRAWING|DIBUJO|PLANO|QR)/]];
+const kind=h=>{const u=String(h||'').trim().toUpperCase();for(const [k,re] of HDR) if(re.test(u)) return k;return null;};
+function colIdx(ref){const m=/^([A-Z]+)/.exec(ref);let n=0;for(const c of m[1]) n=n*26+c.charCodeAt(0)-64;return n-1;}
+const tags=(doc,n)=>Array.from(doc.getElementsByTagNameNS('*',n));
+async function readXlsx(buf){
+  const z=await JSZip.loadAsync(buf), P=new DOMParser(), xml=async p=>{const f=z.file(p);return f?P.parseFromString(await f.async('string'),'application/xml'):null;};
+  const sst=[]; const ss=await xml('xl/sharedStrings.xml'); if(ss) tags(ss,'si').forEach(si=>sst.push(tags(si,'t').map(x=>x.textContent).join('')));
+  const wb=await xml('xl/workbook.xml'), rel=await xml('xl/_rels/workbook.xml.rels'), R={};
+  tags(rel,'Relationship').forEach(r=>R[r.getAttribute('Id')]=r.getAttribute('Target'));
+  const out=[];
+  for(const s of tags(wb,'sheet')){
+    const rid=s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id')||s.getAttribute('r:id');
+    let tg=R[rid]||''; tg=tg.replace(/^\/?xl\//,'').replace(/^\//,''); const d=await xml('xl/'+tg); if(!d) continue;
+    const rows=[]; tags(d,'row').forEach(r=>{const ri=+r.getAttribute('r')-1;const row=rows[ri]=[];
+      tags(r,'c').forEach(c=>{const ty=c.getAttribute('t'), v=tags(c,'v')[0], ci=colIdx(c.getAttribute('r'));let val='';
+        if(ty==='s') val=v?sst[+v.textContent]??'':''; else if(ty==='inlineStr') val=tags(c,'t').map(x=>x.textContent).join(''); else if(ty==='b') val=v&&v.textContent==='1';
+        else if(ty==='str'||ty==='e') val=v?v.textContent:''; else val=v?(isNaN(+v.textContent)?v.textContent:+v.textContent):'';
+        row[ci]=val;});});
+    out.push({name:s.getAttribute('name'),rows});}
+  return out;}
+function parseList(sheets,file){
+  let project='',name='',headers=null; const lines=[];
+  sheets.forEach(sh=>{
+    sh.rows.slice(0,6).forEach(r=>(r||[]).forEach(v=>{const m=/\b(US\.?\d{3}(?:\.\d+)?)\b/i.exec(String(v||''));if(m&&!project) project=m[1].toUpperCase().replace(/^US(\d)/,'US.$1');
+      const n=/^(.*?)\s+[—-]\s+(LISTA DE TROQUELADOS|STAMP LIST)/i.exec(String(v||''));if(n&&!name) name=n[1].trim();}));
+    let hi=-1,map=null;
+    for(let i=0;i<Math.min(sh.rows.length,15);i++){const r=sh.rows[i]||[];const ks=r.map(kind);if(ks.includes('mark')&&ks.includes('stamp')){hi=i;map=r;break;}}
+    if(hi<0) return;
+    const H=map.map((h,ci)=>({h:String(h??'').trim(),k:kind(h),ci})).filter(x=>x.h&&x.k!=='dwg');
+    if(!headers) headers=H.map(x=>x.h);
+    for(let i=hi+1;i<sh.rows.length;i++){const r=sh.rows[i]||[];const g=k=>{const x=H.find(y=>y.k===k);return x?r[x.ci]:'';};
+      const mk=g('mark'); if(mk===''||mk==null){ if(String(r[0]??'').toUpperCase().startsWith('TOTAL')) break; continue; }
+      if(r.some(c=>/^\s*TOTAL\b/i.test(String(c??'')))) continue;
+      const v={}; H.forEach(x=>{ const target=headers.find(h=>kind(h)===x.k&&x.k)||x.h; v[target]=r[x.ci]??''; if(!headers.includes(target)) headers.push(target); });
+      const q=+g('qty'); lines.push({sheet:sh.name,v,mk:up(mk),st:up(g('stamp')),qty:isFinite(q)&&q>0?q:1,wt:+g('wt')||0,sa:+g('sa')||0});}
+  });
+  if(!lines.length) return null;
+  return {project,name,file,headers,lines};}
+
+$('file').onchange=async e=>{const f=e.target.files[0]; if(!f) return; e.target.value='';
+  try{ const sh=await readXlsx(await f.arrayBuffer()); const l=parseList(sh,f.name); if(!l){ show('bad',t('No se encontró una lista de troquelados en ese Excel (hoja con columnas STAMP y MARK).')); return; }
+    if(L&&S.length&&L.project!==l.project){ S=[]; save(); }
+    L=l; LS.set('desp:list',L); render(); $('gun').focus();
+  }catch(err){ console.error(err); show('bad',String(err.message||err)); }};
+
+/* ---------- escanear ---------- */
+function parse(code){ code=String(code||'').trim(); const h=code.indexOf('#'); const body=h>=0?code.slice(h+1):code;
+  let proj=''; const m=/\/(US\.\d{3}(?:\.\d+)?)\//i.exec(code); if(m) proj=m[1].toUpperCase();
+  const p=decodeURIComponent(body.replace(/\+/g,' ')).split('~'); return {proj,mk:up(p[0]||''),st:up(p[1]||''),unit:p[2]||''}; }
+const shipped=li=>S.filter(s=>s.li===li).length;
+function find(p){ if(!L) return -1; const idx=[]; L.lines.forEach((l,i)=>{ if(l.mk===p.mk&&(!p.st||l.st===p.st)) idx.push(i); });
+  if(!idx.length&&p.st) L.lines.forEach((l,i)=>{ if(l.st===p.st&&!idx.includes(i)) idx.push(i); });
+  if(!idx.length) L.lines.forEach((l,i)=>{ if(l.mk===p.mk) idx.push(i); });
+  if(!idx.length) return -1; return idx.find(i=>shipped(i)<L.lines[i].qty)??idx[0]; }
+let lastCode='',lastAt=0;
+function scan(code,fromCam){
+  code=String(code||'').trim(); if(!code||!L) return null; const now=Date.now();
+  if(fromCam&&code===lastCode&&now-lastAt<2500) return null; lastCode=code; lastAt=now;
+  const p=parse(code); let li=-1, status;
+  if(p.proj&&L.project&&p.proj!==L.project) status='bad-proj'; else { li=find(p); status=li<0?'bad':(shipped(li)>=L.lines[li].qty?'warn':'ok'); }
+  S.push({ts:now,truck,code,li,status}); save(); render();
+  const l=li>=0?L.lines[li]:null, desc=l?[l.st,l.mk.replace(/^.*?[-_]?(?=[^-_]*$)/,''),l.v[L.headers.find(h=>kind(h)==='desc')]||''].filter(Boolean).join(' · '):p.mk;
+  const txt=status==='ok'?t('OK')+' — '+desc+` (${shipped(li)} ${t('de')} ${l.qty})`:status==='warn'?t('Ya se despacharon todas')+' — '+desc+` (${shipped(li)} ${t('de')} ${l.qty})`:status==='bad-proj'?t('Otro proyecto')+' — '+p.proj:t('No está en la lista')+' — '+(p.st||p.mk);
+  const cls=status==='ok'?'ok':status==='warn'?'warn':'bad';
+  show(cls,txt,code); feedback(cls); return {cls,txt}; }
+function show(cls,txt,code){ const m=$('msg'); m.className=cls; m.innerHTML=esc(txt)+(code?'<small>'+esc(code)+'</small>':''); }
+let AC=null;
+function feedback(cls){ try{ navigator.vibrate&&navigator.vibrate(cls==='ok'?80:[120,80,120]); }catch(e){}
+  try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); const o=AC.createOscillator(), g=AC.createGain(); o.frequency.value=cls==='ok'?1200:cls==='warn'?600:300; g.gain.value=.15; o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+(cls==='ok'?.12:.35)); }catch(e){} }
+$('gun').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); scan(e.target.value,false); e.target.value=''; } });
+$('truck').oninput=e=>{ truck=e.target.value; LS.set('desp:truck',truck); };
+$('undo').onclick=()=>{ if(S.length){ S.pop(); save(); render(); $('msg').className=''; } };
+let clr=0; $('clear').onclick=()=>{ if(!S.length) return; if(Date.now()-clr>3000){ clr=Date.now(); $('clear').textContent=t('Tocar otra vez para borrar todo'); setTimeout(()=>{$('clear').textContent=t('Nuevo despacho');},3000); return; }
+  S=[]; save(); clr=0; $('clear').textContent=t('Nuevo despacho'); $('msg').className=''; render(); };
+$('tb').onclick=e=>{ const b=e.target.closest('[data-del]'); if(!b) return; const i=+b.dataset.del; S.splice(i,1); save(); render(); };
+
+/* ---------- cámara ---------- */
+let stream=null, raf=0, det=null; const cv=document.createElement('canvas'), cx=cv.getContext('2d',{willReadFrequently:true});
+async function camOpen(){ try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false}); }
+  catch(e){ show('bad',t('No se pudo abrir la cámara.')+' '+(e.message||'')); return; }
+  const v=$('vid'); v.srcObject=stream; await v.play().catch(()=>{}); $('cam').classList.add('on'); $('camMsg').className='';
+  try{ if('BarcodeDetector' in window&&(await BarcodeDetector.getSupportedFormats()).includes('qr_code')) det=new BarcodeDetector({formats:['qr_code']}); }catch(e){ det=null; }
+  let busy=false, last=0;
+  const loop=async ts=>{ raf=requestAnimationFrame(loop); if(busy||ts-last<120||v.readyState<2) return; last=ts; busy=true;
+    try{ let txt=null;
+      if(det){ const r=await det.detect(v); if(r&&r[0]) txt=r[0].rawValue; }
+      else{ const w=v.videoWidth,h=v.videoHeight,s=Math.min(1,720/Math.max(w,h)); cv.width=w*s|0; cv.height=h*s|0; cx.drawImage(v,0,0,cv.width,cv.height);
+        const d=cx.getImageData(0,0,cv.width,cv.height); const r=jsQR(d.data,cv.width,cv.height,{inversionAttempts:'dontInvert'}); if(r) txt=r.data; }
+      if(txt){ const r=scan(txt,true); if(r){ const m=$('camMsg'); m.className=r.cls; m.textContent=r.txt; clearTimeout(m._t); m._t=setTimeout(()=>m.className='',1800); } }
+    }catch(e){} busy=false; };
+  raf=requestAnimationFrame(loop); }
+function camClose(){ cancelAnimationFrame(raf); if(stream) stream.getTracks().forEach(x=>x.stop()); stream=null; $('cam').classList.remove('on'); }
+$('camBtn').onclick=camOpen; $('camClose').onclick=camClose;
+
+/* ---------- pantalla ---------- */
+function vals(s){ if(s.li>=0) return L.lines[s.li].v; const q=parse(s.code), o={}; L.headers.forEach(h=>{ const k=kind(h); if(k==='mark') o[h]=q.mk; if(k==='stamp') o[h]=q.st; }); return o; }
+const fmt=(n,d=0)=>Number(n||0).toLocaleString(lang==='en'?'en-US':'es-US',{maximumFractionDigits:d,minimumFractionDigits:d});
+const qrCache=new Map();
+function qrPng(text,px){ const k=text+'|'+px; if(qrCache.has(k)) return qrCache.get(k); const q=qrMatrix(text), qz=2, n=q.size+2*qz, s=Math.max(1,Math.floor(px/n)); const c=document.createElement('canvas'); c.width=c.height=n*s;
+  const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.fillStyle='#000'; for(let r=0;r<q.size;r++) for(let cc=0;cc<q.size;cc++) if(q.get(r,cc)) g.fillRect((cc+qz)*s,(r+qz)*s,s,s);
+  const u=c.toDataURL('image/png'); qrCache.set(k,u); return u; }
+const stTxt=s=>s==='ok'?t('OK'):s==='warn'?t('Ya se despacharon todas'):s==='bad-proj'?t('Otro proyecto'):t('No está en la lista');
+const stCls=s=>s==='ok'?'st-ok':s==='warn'?'st-warn':'st-bad';
+function totals(){ let w=0,a=0; S.forEach(s=>{ if(s.li>=0&&s.status!=='bad-proj'){ const l=L.lines[s.li]; w+=l.wt/(l.qty||1); a+=l.sa/(l.qty||1); } });
+  const done=L?L.lines.filter((l,i)=>shipped(i)>=l.qty).length:0; return {w,a,done}; }
+function render(){
+  if(!$('tb')) return;
+  if(!L){ $('work').hidden=true; $('listInfo').textContent=''; return; }
+  $('work').hidden=false; $('truck').value=truck;
+  document.querySelector('#loadCard label span').textContent=t('Cambiar lista de troquelados');
+  const pcs=L.lines.reduce((a,l)=>a+l.qty,0);
+  $('title').textContent=[L.project,L.name].filter(Boolean).join(' · ')||t('Despacho de piezas');
+  $('listInfo').textContent=`${L.file} · ${L.lines.length} ${t('líneas')} · ${fmt(pcs)} ${t('piezas')}`;
+  const T=totals(); $('sN').textContent=fmt(S.filter(s=>s.status==='ok'||s.status==='warn').length); $('sL').textContent=`${T.done} / ${L.lines.length}`; $('sW').textContent=fmt(T.w); $('sS').textContent=fmt(T.a,1);
+  $('th').innerHTML='<tr>'+['#',t('HORA'),...L.headers,t('QR'),t('ESTADO'),''].map(h=>`<th>${esc(h)}</th>`).join('')+'</tr>';
+  const rows=[]; for(let i=S.length-1;i>=0&&rows.length<300;i--){ const s=S[i], l=s.li>=0?L.lines[s.li]:null;
+    rows.push(`<tr><td>${i+1}</td><td>${esc(new Date(s.ts).toLocaleTimeString(lang==='en'?'en-US':'es-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}))}</td>${L.headers.map(h=>`<td>${esc(vals(s)[h]??'')}</td>`).join('')}<td class="q"><img alt="" src="${qrPng(s.code,112)}"></td><td class="${stCls(s.status)}">${esc(stTxt(s.status))}</td><td><button class="x" type="button" data-del="${i}" aria-label="×">×</button></td></tr>`); }
+  $('tb').innerHTML=rows.join('');
+}
+
+/* ---------- Excel ---------- */
+const xe=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'');
+const colL=i=>{let s='';i++;while(i){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=(i-1)/26|0;}return s;};
+function cell(r,c,v,st){ const ref=colL(c)+(r+1), sa=st?` s="${st}"`:''; if(v===''||v==null) return st?`<c r="${ref}"${sa}/>`:'';
+  if(typeof v==='number'&&isFinite(v)) return `<c r="${ref}"${sa}><v>${v}</v></c>`; return `<c r="${ref}"${sa} t="inlineStr"><is><t xml:space="preserve">${xe(v)}</t></is></c>`; }
+// estilos: 0 normal,1 título,2 encabezado,3 celda con borde,4 OK,5 aviso,6 error,7 número con borde,8 total
+const STYLES=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.00"/></numFmts>
+<fonts count="5"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="14"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF9C0006"/><name val="Arial"/></font></fonts>
+<fills count="6"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1D2326"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC6EFCE"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFEB9C"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFC7CE"/></patternFill></fill></fills>
+<borders count="2"><border/><border><left style="thin"><color rgb="FFB0B7BB"/></left><right style="thin"><color rgb="FFB0B7BB"/></right><top style="thin"><color rgb="FFB0B7BB"/></top><bottom style="thin"><color rgb="FFB0B7BB"/></bottom></border></borders>
+<cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="9"><xf/><xf fontId="1" applyFont="1"/>
+<xf fontId="2" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf borderId="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf fontId="3" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf fontId="3" fillId="4" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf fontId="4" fillId="5" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="164" borderId="1" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf fontId="3" numFmtId="164" borderId="1" applyFont="1" applyNumberFormat="1" applyBorder="1"/></cellXfs></styleSheet>`;
+function sheetXml(rows,{cols,heights,freeze,filter,drawing,merge}){
+  let x=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>`;
+  x+=`<sheetViews><sheetView workbookViewId="0">${freeze?`<pane ySplit="${freeze}" topLeftCell="A${freeze+1}" activePane="bottomLeft" state="frozen"/>`:''}</sheetView></sheetViews>`;
+  if(cols) x+='<cols>'+cols.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')+'</cols>';
+  x+='<sheetData>'+rows.map((r,ri)=>`<row r="${ri+1}"${heights&&heights[ri]?` ht="${heights[ri]}" customHeight="1"`:''}>${(r||[]).map((c,ci)=>c==null?'':typeof c==='object'&&!Array.isArray(c)?cell(ri,ci,c.v,c.s):cell(ri,ci,c,0)).join('')}</row>`).join('')+'</sheetData>';
+  if(filter) x+=`<autoFilter ref="${filter}"/>`;
+  if(merge&&merge.length) x+=`<mergeCells count="${merge.length}">${merge.map(m=>`<mergeCell ref="${m}"/>`).join('')}</mergeCells>`;
+  x+=`<pageMargins left="0.3" right="0.3" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="1" orientation="landscape" fitToWidth="1" fitToHeight="0"/>`;
+  if(drawing) x+='<drawing r:id="rId1"/>'; return x+'</worksheet>'; }
+async function download(){
+  if(!L) return; const z=new JSZip(), now=new Date(), H=L.headers, dstr=now.toLocaleDateString(lang==='en'?'en-US':'es-US');
+  const fixed=['#',t('FECHA'),t('HORA'),t('CAMIÓN / REMISIÓN')], hdr=[...fixed,...H,t('QR'),t('ESTADO')], qrCol=hdr.length-2;
+  const numK=new Set(['qty','wt','sa','sno']);
+  const R=[[{v:[L.project,L.name].filter(Boolean).join(' · ')+' — '+t('DESPACHO').toUpperCase(),s:1}],[t('Fecha')+': '+dstr+(truck?'   ·   '+t('CAMIÓN / REMISIÓN')+': '+truck:'')],[],hdr.map(h=>({v:h,s:2}))];
+  const hts={3:30}, pics=[], media=new Map();
+  S.forEach((s,i)=>{ const l=s.li>=0?L.lines[s.li]:null, d=new Date(s.ts);
+    const row=[{v:i+1,s:3},{v:d.toLocaleDateString(lang==='en'?'en-US':'es-US'),s:3},{v:d.toLocaleTimeString(lang==='en'?'en-US':'es-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),s:3},{v:s.truck||'',s:3}];
+    const VV=vals(s); H.forEach(h=>{ const v=VV[h]??''; row.push({v:v===''||v==null?'':v,s:typeof v==='number'&&(kind(h)==='wt'||kind(h)==='sa')?7:3}); });
+    row.push({v:'',s:3}); row.push({v:stTxt(s.status),s:s.status==='ok'?4:s.status==='warn'?5:6});
+    R.push(row); const ri=R.length-1; hts[ri]=62;
+    if(!media.has(s.code)) media.set(s.code,'qr'+(media.size+1)+'.png'); pics.push({r:ri,c:qrCol,img:media.get(s.code)}); });
+  // fila de totales
+  let tw=0,ta=0; S.forEach(s=>{ if(s.li>=0&&s.status!=='bad-proj'){ const l=L.lines[s.li]; tw+=l.wt/(l.qty||1); ta+=l.sa/(l.qty||1); } });
+  const tot=new Array(hdr.length).fill(null); tot[0]={v:t('Total despachado'),s:8}; const iw=H.findIndex(h=>kind(h)==='wt'), ia=H.findIndex(h=>kind(h)==='sa');
+  if(iw>=0) tot[fixed.length+iw]={v:Math.round(tw*100)/100,s:8}; if(ia>=0) tot[fixed.length+ia]={v:Math.round(ta*100)/100,s:8};
+  const iq=H.findIndex(h=>kind(h)==='qty'); tot[fixed.length+(iq>=0?iq:0)]= {v:S.filter(s=>s.status==='ok'||s.status==='warn').length,s:8}; R.push([]); R.push(tot);
+  const wid=h=>{ const k=kind(h); return k==='desc'?20:k==='mark'?18:k==='len'?13:k==='tipo2'?13:k==='tipo'?14:k==='coat'?12:k==='wt'||k==='sa'?12:9; };
+  const cols=[5,11,11,18,...H.map(wid),11,18];
+  // resumen por línea
+  const RS=[[{v:[L.project,L.name].filter(Boolean).join(' · ')+' — '+t('Resumen').toUpperCase(),s:1}],[],[ t('HOJA'),...H,t('DESPACHADO'),t('PENDIENTE')].map(h=>({v:h,s:2}))];
+  L.lines.forEach((l,i)=>{ const n=shipped(i), p=Math.max(0,l.qty-n); RS.push([{v:l.sheet,s:3},...H.map(h=>({v:l.v[h]??'',s:3})),{v:n,s:n>=l.qty?4:n>0?5:3},{v:p,s:p?3:4}]); });
+  z.file('[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${pics.length?'<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>':''}</Types>`);
+  z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+  const n1=t('DESPACHO').toUpperCase().slice(0,31), n2=t('Resumen').toUpperCase().slice(0,31);
+  z.file('xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xe(n1)}" sheetId="1" r:id="rId1"/><sheet name="${xe(n2)}" sheetId="2" r:id="rId2"/></sheets><definedNames><definedName name="_xlnm.Print_Titles" localSheetId="0">'${xe(n1)}'!$4:$4</definedName><definedName name="_xlnm.Print_Titles" localSheetId="1">'${xe(n2)}'!$3:$3</definedName></definedNames></workbook>`);
+  z.file('xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+  z.file('xl/styles.xml',STYLES);
+  const last=colL(hdr.length-1);
+  z.file('xl/worksheets/sheet1.xml',sheetXml(R,{cols,heights:hts,freeze:4,filter:S.length?`A4:${last}${3+S.length+1}`:null,drawing:pics.length>0}));
+  z.file('xl/worksheets/sheet2.xml',sheetXml(RS,{cols:[16,...H.map(wid),12,12],heights:{2:30},freeze:3,filter:`A3:${colL(H.length+2)}${RS.length}`}));
+  if(pics.length){
+    z.file('xl/worksheets/_rels/sheet1.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>');
+    const ids=new Map(); let rel='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+    media.forEach((f,code)=>{ const id='rId'+(ids.size+1); ids.set(f,id); rel+=`<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/${f}"/>`;
+      z.file('xl/media/'+f,qrPng(code,240).split(',')[1],{base64:true}); });
+    z.file('xl/drawings/_rels/drawing1.xml.rels',rel+'</Relationships>');
+    const E=9525, sz=74*E; let dr='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
+    pics.forEach((p,i)=>{ dr+=`<xdr:oneCellAnchor><xdr:from><xdr:col>${p.c}</xdr:col><xdr:colOff>${4*E}</xdr:colOff><xdr:row>${p.r}</xdr:row><xdr:rowOff>${3*E}</xdr:rowOff></xdr:from><xdr:ext cx="${sz}" cy="${sz}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${i+2}" name="QR ${i+1}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${ids.get(p.img)}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${sz}" cy="${sz}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`; });
+    z.file('xl/drawings/drawing1.xml',dr+'</xdr:wsDr>'); }
+  const blob=await z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',compression:'DEFLATE'});
+  const pad=n=>String(n).padStart(2,'0'), fn=`${(L.project||'Proyecto').replace(/[^\w.-]+/g,'_')}_${t('DESPACHO').toUpperCase()}_${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.xlsx`;
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fn; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000); return fn; }
+EN['DESPACHO']='SHIPPING';
+$('xlsBtn').onclick=()=>download().catch(e=>show('bad',String(e.message||e)));
+window.__desp={scan,download,get L(){return L},get S(){return S}};
+paintLang();
+})();
+</script>
+</body>
+</html>
