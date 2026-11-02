@@ -1,7 +1,8 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" translate="no" class="notranslate">
 <head>
 <meta charset="utf-8">
+<meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Despacho</title>
 <style>
@@ -84,6 +85,7 @@ td .x{all:unset;cursor:pointer;padding:6px 10px;color:var(--bad);font-weight:700
       </div>
     </div>
     <div id="msg" role="status" aria-live="polite"></div>
+    <div class="card" id="dlCard" hidden><p style="margin:0 0 10px;font-weight:600" id="dlName"></p><div class="row"><button class="btn pri big" id="shareBtn" type="button" data-t="Compartir o guardar Excel"></button><a class="btn big" id="openBtn" data-t="Abrir Excel"></a></div><p class="mut" style="margin:10px 0 0" data-t="Si no aparece en Descargas, usa «Compartir o guardar Excel» para mandarlo por correo, Teams o WhatsApp, o guardarlo en Archivos o Drive."></p></div>
     <div class="card">
       <div class="stats">
         <div class="stat"><b id="sN">0</b><span data-t="Piezas escaneadas"></span></div>
@@ -129,7 +131,7 @@ const EN={'Despacho':'Shipping','Despacho de piezas':'Piece shipping',
  'FECHA':'DATE','HORA':'TIME','CAMIÓN / REMISIÓN':'TRUCK / DELIVERY NOTE','ESTADO':'STATUS','QR':'QR','#':'#','DESPACHADO':'SHIPPED','PENDIENTE':'PENDING','HOJA':'SHEET',
  'líneas':'lines','piezas':'pieces','No se encontró una lista de troquelados en ese Excel (hoja con columnas STAMP y MARK).':'No stamp list found in that Excel (sheet with STAMP and MARK columns).',
  'No se pudo abrir la cámara.':'Could not open the camera.','Escaneado':'Scanned','Total despachado':'Total shipped','Proyecto':'Project','Fecha':'Date',
- 'Lista':'List','Resumen':'Summary','Cuenta':'Count','línea':'line','de':'of'};
+ 'Lista':'List','Compartir o guardar Excel':'Share or save Excel','Abrir Excel':'Open Excel','Excel listo':'Excel ready','Si no aparece en Descargas, usa «Compartir o guardar Excel» para mandarlo por correo, Teams o WhatsApp, o guardarlo en Archivos o Drive.':'If it does not show up in Downloads, use “Share or save Excel” to send it by email, Teams or WhatsApp, or save it to Files or Drive.','Resumen':'Summary','Cuenta':'Count','línea':'line','de':'of'};
 let lang=(()=>{try{const q=new URLSearchParams(location.search).get('lang');if(q)return q==='en'?'en':'es';return localStorage.getItem('lang')==='en'?'en':'es'}catch(e){return 'es'}})();
 const t=s=>lang==='en'&&EN[s]!=null?EN[s]:s;
 function paintLang(){document.documentElement.lang=lang;document.querySelectorAll('[data-t]').forEach(e=>e.textContent=t(e.dataset.t));
@@ -335,7 +337,12 @@ async function download(){
     z.file('xl/drawings/drawing1.xml',dr+'</xdr:wsDr>'); }
   const blob=await z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',compression:'DEFLATE'});
   const pad=n=>String(n).padStart(2,'0'), fn=`${(L.project||'Proyecto').replace(/[^\w.-]+/g,'_')}_${t('DESPACHO').toUpperCase()}_${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.xlsx`;
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fn; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000); return fn; }
+  if(lastUrl) URL.revokeObjectURL(lastUrl); lastUrl=URL.createObjectURL(blob); lastFile=new File([blob],fn,{type:blob.type});
+  const a=document.createElement('a'); a.href=lastUrl; a.download=fn; document.body.appendChild(a); a.click(); setTimeout(()=>a.remove(),1000);
+  $('dlName').textContent=t('Excel listo')+': '+fn; const o=$('openBtn'); o.href=lastUrl; o.download=fn;
+  $('shareBtn').hidden=!(navigator.canShare&&navigator.canShare({files:[lastFile]})); $('dlCard').hidden=false; $('dlCard').scrollIntoView({behavior:'smooth',block:'center'}); return fn; }
+let lastUrl=null,lastFile=null;
+$('shareBtn').onclick=async()=>{ if(!lastFile) return; try{ await navigator.share({files:[lastFile],title:lastFile.name}); }catch(e){ if(e&&e.name!=='AbortError') show('bad',String(e.message||e)); } };
 EN['DESPACHO']='SHIPPING';
 $('xlsBtn').onclick=()=>download().catch(e=>show('bad',String(e.message||e)));
 window.__desp={scan,download,get L(){return L},get S(){return S}};
