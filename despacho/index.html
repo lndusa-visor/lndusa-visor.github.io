@@ -77,7 +77,7 @@ td .x{all:unset;cursor:pointer;padding:6px 10px;color:var(--bad);font-weight:700
   <section id="work" hidden>
     <div class="card">
       <div class="row">
-        <label class="f"><span data-t="Camión / remisión"></span><input type="text" id="truck" autocomplete="off"></label>
+        <label class="f"><span data-t="Número de paleta"></span><input type="text" id="truck" autocomplete="off"></label>
         <label class="f"><span data-t="Pistola o código (Enter)"></span><input type="text" id="gun" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url"></label>
       </div>
       <div class="row" style="margin-top:12px">
@@ -124,7 +124,7 @@ const LS={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return 
 const EN={'Despacho':'Shipping','Despacho de piezas':'Piece shipping',
  'Carga la lista de troquelados del proyecto y escanea los QR de las piezas con la cámara o con la pistola.':'Load the project stamp list and scan the piece QR codes with the camera or the scanner gun.',
  'Cargar lista de troquelados (Excel)':'Load stamp list (Excel)','Cambiar lista de troquelados':'Change stamp list',
- 'Camión / remisión':'Truck / delivery note','Pistola o código (Enter)':'Scanner gun or code (Enter)',
+ 'Número de paleta':'Pallet number','NO. PALETA':'PALLET NO.','Paleta':'Pallet','Pistola o código (Enter)':'Scanner gun or code (Enter)',
  'Escanear con cámara':'Scan with camera','Descargar Excel':'Download Excel','Piezas escaneadas':'Pieces scanned','Líneas completas':'Lines complete',
  'Peso (lb)':'Weight (lb)','Superficie (ft²)':'Surface (ft²)','Deshacer último':'Undo last','Nuevo despacho':'New shipment','Tocar otra vez para borrar todo':'Tap again to clear all',
  'Los escaneos se guardan en este teléfono hasta que empieces un nuevo despacho.':'Scans are saved on this phone until you start a new shipment.',
@@ -281,9 +281,9 @@ function render(){
   $('title').textContent=[L.project,L.name].filter(Boolean).join(' · ')||t('Despacho de piezas');
   $('listInfo').textContent=`${L.file} · ${L.lines.length} ${t('líneas')} · ${fmt(pcs)} ${t('piezas')}`;
   const T=totals(); $('sN').textContent=fmt(S.filter(s=>s.status==='ok'||s.status==='warn').length); $('sL').textContent=`${T.done} / ${L.lines.length}`; $('sW').textContent=fmt(T.w); $('sS').textContent=fmt(T.a,1);
-  $('th').innerHTML='<tr>'+['#',...L.headers,t('DIBUJO'),t('QR'),t('ESTADO'),t('HORA'),''].map(h=>`<th>${esc(h)}</th>`).join('')+'</tr>';
+  $('th').innerHTML='<tr>'+['#',...L.headers,t('DIBUJO'),t('QR'),t('ESTADO'),t('HORA'),t('NO. PALETA'),''].map(h=>`<th>${esc(h)}</th>`).join('')+'</tr>';
   const rows=[]; for(let i=S.length-1;i>=0&&rows.length<300;i--){ const s=S[i], l=s.li>=0?L.lines[s.li]:null;
-    rows.push(`<tr><td>${i+1}</td>${L.headers.map(h=>`<td>${esc(vals(s)[h]??'')}</td>`).join('')}<td class="d">${(()=>{ const l=s.li>=0?L.lines[s.li]:null, im=l&&l.img&&IMG.get(l.img); return im?`<img alt="" src="data:image/${im.ext};base64,${im.b64}">`:''; })()}</td><td class="q"><img alt="" src="${qrPng(s.code,112)}"></td><td class="${stCls(s.status)}">${esc(stTxt(s.status))}</td><td>${esc(new Date(s.ts).toLocaleTimeString(lang==='en'?'en-US':'es-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}))}</td><td><button class="x" type="button" data-del="${i}" aria-label="×">×</button></td></tr>`); }
+    rows.push(`<tr><td>${i+1}</td>${L.headers.map(h=>`<td>${esc(vals(s)[h]??'')}</td>`).join('')}<td class="d">${(()=>{ const l=s.li>=0?L.lines[s.li]:null, im=l&&l.img&&IMG.get(l.img); return im?`<img alt="" src="data:image/${im.ext};base64,${im.b64}">`:''; })()}</td><td class="q"><img alt="" src="${qrPng(s.code,112)}"></td><td class="${stCls(s.status)}">${esc(stTxt(s.status))}</td><td>${esc(new Date(s.ts).toLocaleTimeString(lang==='en'?'en-US':'es-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}))}</td><td>${esc(s.truck||'')}</td><td><button class="x" type="button" data-del="${i}" aria-label="×">×</button></td></tr>`); }
   $('tb').innerHTML=rows.join('');
 }
 
@@ -316,15 +316,15 @@ function sheetXml(rows,{cols,heights,freeze,filter,drawing,merge}){
   if(drawing) x+='<drawing r:id="rId1"/>'; return x+'</worksheet>'; }
 async function download(){
   if(!L) return; const z=new JSZip(), now=new Date(), H=L.headers, dstr=now.toLocaleDateString(lang==='en'?'en-US':'es-US');
-  const fixed=['#',t('CAMIÓN / REMISIÓN')], hdr=[...fixed,...H,t('DIBUJO'),t('QR'),t('ESTADO'),t('FECHA'),t('HORA')], dwCol=fixed.length+H.length, qrCol=dwCol+1;
+  const fixed=['#'], hdr=[...fixed,...H,t('DIBUJO'),t('QR'),t('ESTADO'),t('FECHA'),t('HORA'),t('NO. PALETA')], dwCol=fixed.length+H.length, qrCol=dwCol+1;
   const numK=new Set(['qty','wt','sa','sno']);
-  const R=[[{v:[L.project,L.name].filter(Boolean).join(' · ')+' — '+t('DESPACHO').toUpperCase(),s:1}],[t('Fecha')+': '+dstr+(truck?'   ·   '+t('CAMIÓN / REMISIÓN')+': '+truck:'')],[],hdr.map(h=>({v:h,s:2}))];
+  const R=[[{v:[L.project,L.name].filter(Boolean).join(' · ')+' — '+t('DESPACHO').toUpperCase(),s:1}],[t('Fecha')+': '+dstr+(truck?'   ·   '+t('Paleta')+': '+truck:'')],[],hdr.map(h=>({v:h,s:2}))];
   const hts={3:30}, pics=[], media=new Map();
   S.forEach((s,i)=>{ const l=s.li>=0?L.lines[s.li]:null, d=new Date(s.ts);
-    const row=[{v:i+1,s:3},{v:s.truck||'',s:3}];
+    const row=[{v:i+1,s:3}];
     const VV=vals(s); H.forEach(h=>{ const v=VV[h]??''; row.push({v:v===''||v==null?'':v,s:typeof v==='number'&&(kind(h)==='wt'||kind(h)==='sa')?7:3}); });
     row.push({v:'',s:3}); row.push({v:'',s:3}); row.push({v:stTxt(s.status),s:s.status==='ok'?4:s.status==='warn'?5:6});
-    row.push({v:d.toLocaleDateString(lang==='en'?'en-US':'es-US'),s:3}); row.push({v:d.toLocaleTimeString(lang==='en'?'en-US':'es-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),s:3});
+    row.push({v:d.toLocaleDateString(lang==='en'?'en-US':'es-US'),s:3}); row.push({v:d.toLocaleTimeString(lang==='en'?'en-US':'es-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),s:3}); row.push({v:s.truck||'',s:3});
     R.push(row); const ri=R.length-1; hts[ri]=62;
     if(!media.has(s.code)) media.set(s.code,{f:'qr'+(media.size+1)+'.png',qr:s.code}); pics.push({r:ri,c:qrCol,img:media.get(s.code).f,cx:74*9525,cy:74*9525});
     const im=l&&l.img&&IMG.get(l.img); if(im){ const k='d:'+l.img; if(!media.has(k)) media.set(k,{f:'dw'+(media.size+1)+'.'+(im.ext==='jpeg'?'jpeg':'png'),im}); const sc=Math.min(1,(180*9525)/im.cx,(74*9525)/im.cy); pics.push({r:ri,c:dwCol,img:media.get(k).f,cx:Math.round(im.cx*sc),cy:Math.round(im.cy*sc)}); } });
@@ -334,7 +334,7 @@ async function download(){
   if(iw>=0) tot[fixed.length+iw]={v:Math.round(tw*100)/100,s:8}; if(ia>=0) tot[fixed.length+ia]={v:Math.round(ta*100)/100,s:8};
   const iq=H.findIndex(h=>kind(h)==='qty'); tot[fixed.length+(iq>=0?iq:0)]= {v:S.filter(s=>s.status==='ok'||s.status==='warn').length,s:8}; R.push([]); R.push(tot);
   const wid=h=>{ const k=kind(h); return k==='desc'?20:k==='mark'?18:k==='len'?13:k==='tipo2'?13:k==='tipo'?14:k==='coat'?12:k==='wt'||k==='sa'?12:9; };
-  const cols=[5,16,...H.map(wid),27,11,18,11,12];
+  const cols=[5,...H.map(wid),27,11,18,11,12,14];
   // resumen por línea
   const RS=[[{v:[L.project,L.name].filter(Boolean).join(' · ')+' — '+t('Resumen').toUpperCase(),s:1}],[],[ t('HOJA'),...H,t('DESPACHADO'),t('PENDIENTE')].map(h=>({v:h,s:2}))];
   L.lines.forEach((l,i)=>{ const n=shipped(i), p=Math.max(0,l.qty-n); RS.push([{v:l.sheet,s:3},...H.map(h=>({v:l.v[h]??'',s:3})),{v:n,s:n>=l.qty?4:n>0?5:3},{v:p,s:p?3:4}]); });
