@@ -174,7 +174,7 @@ function parseList(sheets,file){
     sh.rows.slice(0,6).forEach(r=>(r||[]).forEach(v=>{const m=/\b(US\.?\d{3}(?:\.\d+)?)\b/i.exec(String(v||''));if(m&&!project) project=m[1].toUpperCase().replace(/^US(\d)/,'US.$1');
       const n=/^(.*?)\s+[—-]\s+(LISTA DE TROQUELADOS|STAMP LIST)/i.exec(String(v||''));if(n&&!name) name=n[1].trim();}));
     let hi=-1,map=null;
-    for(let i=0;i<Math.min(sh.rows.length,15);i++){const r=sh.rows[i]||[];const ks=r.map(kind);if(ks.includes('mark')&&ks.includes('stamp')){hi=i;map=r;break;}}
+    for(let i=0;i<Math.min(sh.rows.length,15);i++){const r=sh.rows[i]||[];const ks=r.map(kind);if(ks.includes('mark')&&ks.includes('stamp')&&ks.includes('qty')){hi=i;map=r;break;}}
     if(hi<0) return;
     const H=map.map((h,ci)=>({h:String(h??'').trim(),k:kind(h),ci})).filter(x=>x.h&&x.k!=='dwg');
     if(!headers) headers=H.map(x=>x.h);
@@ -190,7 +190,10 @@ function parseList(sheets,file){
 $('file').onchange=async e=>{const f=e.target.files[0]; if(!f) return; e.target.value='';
   try{ const sh=await readXlsx(await f.arrayBuffer()); const l=parseList(sh,f.name); if(!l){ show('bad',t('No se encontró una lista de troquelados en ese Excel (hoja con columnas STAMP y MARK).')); return; }
     if(L&&S.length&&L.project!==l.project){ S=[]; save(); }
-    L=l; LS.set('desp:list',L); render(); $('gun').focus();
+    L=l; LS.set('desp:list',L);
+    const old=S; S=[]; old.forEach(x=>{ const q=parse(x.code); let li=-1, st;
+      if(q.proj&&L.project&&q.proj!==L.project) st='bad-proj'; else { li=find(q); st=li<0?'bad':(shipped(li)>=L.lines[li].qty?'warn':'ok'); }
+      S.push({...x,li,status:st}); }); save(); render(); $('gun').focus();
   }catch(err){ console.error(err); show('bad',String(err.message||err)); }};
 
 /* ---------- escanear ---------- */
