@@ -5,6 +5,14 @@
 <meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Despacho</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1d2326">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Despacho">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <style>
 :root{--bg:#eef1f3;--ink:#1d2326;--mut:#5d6a71;--card:#fff;--line:#d5dbdf;--acc:#b5532a;--top:#1d2326;
   --ok:#1e7a46;--okb:#e3f3ea;--warn:#8a5a00;--warnb:#fdf1d6;--bad:#b3261e;--badb:#fbe4e2;
@@ -66,6 +74,10 @@ td .x{all:unset;cursor:pointer;padding:6px 10px;color:var(--bad);font-weight:700
   <h1 id="title" data-t="Despacho de piezas"></h1>
   <p class="mut" id="sub" data-t="Carga la lista de troquelados del proyecto y escanea los QR de las piezas con la cámara o con la pistola."></p>
 
+  <section class="card" id="instCard" hidden>
+    <div class="row"><button class="btn pri big" id="instBtn" type="button" data-t="Instalar app en este teléfono"></button></div>
+    <p class="mut" id="instIos" style="margin:10px 0 0" hidden data-t="En iPhone/iPad: toca Compartir (cuadro con flecha) → «Agregar a inicio»."></p>
+  </section>
   <section class="card" id="loadCard">
     <div class="row">
       <label class="btn pri big" for="file"><span data-t="Cargar lista de troquelados (Excel)"></span></label>
@@ -132,7 +144,7 @@ const EN={'Despacho':'Shipping','Despacho de piezas':'Piece shipping',
  'FECHA':'DATE','HORA':'TIME','CAMIÓN / REMISIÓN':'TRUCK / DELIVERY NOTE','ESTADO':'STATUS','QR':'QR','#':'#','DESPACHADO':'SHIPPED','PENDIENTE':'PENDING','HOJA':'SHEET',
  'líneas':'lines','piezas':'pieces','No se encontró una lista de troquelados en ese Excel (hoja con columnas STAMP y MARK).':'No stamp list found in that Excel (sheet with STAMP and MARK columns).',
  'No se pudo abrir la cámara.':'Could not open the camera.','Escaneado':'Scanned','Total despachado':'Total shipped','Proyecto':'Project','Fecha':'Date',
- 'Lista':'List','DIBUJO':'DRAWING','Compartir o guardar Excel':'Share or save Excel','Abrir Excel':'Open Excel','Excel listo':'Excel ready','Si no aparece en Descargas, usa «Compartir o guardar Excel» para mandarlo por correo, Teams o WhatsApp, o guardarlo en Archivos o Drive.':'If it does not show up in Downloads, use “Share or save Excel” to send it by email, Teams or WhatsApp, or save it to Files or Drive.','Resumen':'Summary','Cuenta':'Count','línea':'line','de':'of'};
+ 'Lista':'List','Instalar app en este teléfono':'Install app on this phone','En iPhone/iPad: toca Compartir (cuadro con flecha) → «Agregar a inicio».':'On iPhone/iPad: tap Share (square with arrow) → “Add to Home Screen”.','DIBUJO':'DRAWING','Compartir o guardar Excel':'Share or save Excel','Abrir Excel':'Open Excel','Excel listo':'Excel ready','Si no aparece en Descargas, usa «Compartir o guardar Excel» para mandarlo por correo, Teams o WhatsApp, o guardarlo en Archivos o Drive.':'If it does not show up in Downloads, use “Share or save Excel” to send it by email, Teams or WhatsApp, or save it to Files or Drive.','Resumen':'Summary','Cuenta':'Count','línea':'line','de':'of'};
 let lang=(()=>{try{const q=new URLSearchParams(location.search).get('lang');if(q)return q==='en'?'en':'es';return localStorage.getItem('lang')==='en'?'en':'es'}catch(e){return 'es'}})();
 const t=s=>lang==='en'&&EN[s]!=null?EN[s]:s;
 function paintLang(){document.documentElement.lang=lang;document.querySelectorAll('[data-t]').forEach(e=>e.textContent=t(e.dataset.t));
@@ -367,6 +379,13 @@ $('shareBtn').onclick=async()=>{ if(!lastFile) return; try{ await navigator.shar
 EN['DESPACHO']='SHIPPING';
 $('xlsBtn').onclick=()=>download().catch(e=>show('bad',String(e.message||e)));
 window.__desp={scan,download,get L(){return L},get S(){return S}};
+/* ---------- instalar como app ---------- */
+let instEv=null; const standalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e=>console.warn('sw',e));
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); instEv=e; if(!standalone()){ $('instCard').hidden=false; $('instBtn').hidden=false; } });
+window.addEventListener('appinstalled',()=>{ $('instCard').hidden=true; });
+if(!standalone()&&/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)&&'ontouchend' in document){ $('instCard').hidden=false; $('instBtn').hidden=true; $('instIos').hidden=false; }
+$('instBtn').onclick=async()=>{ if(!instEv) return; instEv.prompt(); try{ await instEv.userChoice; }catch(e){} instEv=null; $('instCard').hidden=true; };
 paintLang();
 IDB.get('imgs').then(a=>{ if(a&&L&&!IMG.size){ a.forEach(([k,v])=>IMG.set(k,v)); render(); } });
 })();
