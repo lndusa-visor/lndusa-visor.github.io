@@ -161,8 +161,8 @@ async function readXlsx(buf){
   for(const s of tags(wb,'sheet')){
     const rid=s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id')||s.getAttribute('r:id');
     let tg=R[rid]||''; tg=tg.replace(/^\/?xl\//,'').replace(/^\//,''); const d=await xml('xl/'+tg); if(!d) continue;
-    const rows=[]; tags(d,'row').forEach(r=>{const ri=+r.getAttribute('r')-1;const row=rows[ri]=[];
-      tags(r,'c').forEach(c=>{const ty=c.getAttribute('t'), v=tags(c,'v')[0], ci=colIdx(c.getAttribute('r'));let val='';
+    const rows=[]; let rseq=0; tags(d,'row').forEach(r=>{const ri=r.getAttribute('r')?+r.getAttribute('r')-1:rseq; rseq=ri+1; const row=rows[ri]=[];
+      let seq=0; tags(r,'c').forEach(c=>{const ty=c.getAttribute('t'), v=tags(c,'v')[0], rr=c.getAttribute('r'), ci=rr?colIdx(rr):seq; seq=ci+1; let val='';
         if(ty==='s') val=v?sst[+v.textContent]??'':''; else if(ty==='inlineStr') val=tags(c,'t').map(x=>x.textContent).join(''); else if(ty==='b') val=v&&v.textContent==='1';
         else if(ty==='str'||ty==='e') val=v?v.textContent:''; else val=v?(isNaN(+v.textContent)?v.textContent:+v.textContent):'';
         row[ci]=val;});});
@@ -262,9 +262,9 @@ function render(){
   $('title').textContent=[L.project,L.name].filter(Boolean).join(' · ')||t('Despacho de piezas');
   $('listInfo').textContent=`${L.file} · ${L.lines.length} ${t('líneas')} · ${fmt(pcs)} ${t('piezas')}`;
   const T=totals(); $('sN').textContent=fmt(S.filter(s=>s.status==='ok'||s.status==='warn').length); $('sL').textContent=`${T.done} / ${L.lines.length}`; $('sW').textContent=fmt(T.w); $('sS').textContent=fmt(T.a,1);
-  $('th').innerHTML='<tr>'+['#',t('HORA'),...L.headers,t('QR'),t('ESTADO'),''].map(h=>`<th>${esc(h)}</th>`).join('')+'</tr>';
+  $('th').innerHTML='<tr>'+['#',...L.headers,t('QR'),t('ESTADO'),t('HORA'),''].map(h=>`<th>${esc(h)}</th>`).join('')+'</tr>';
   const rows=[]; for(let i=S.length-1;i>=0&&rows.length<300;i--){ const s=S[i], l=s.li>=0?L.lines[s.li]:null;
-    rows.push(`<tr><td>${i+1}</td><td>${esc(new Date(s.ts).toLocaleTimeString(lang==='en'?'en-US':'es-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}))}</td>${L.headers.map(h=>`<td>${esc(vals(s)[h]??'')}</td>`).join('')}<td class="q"><img alt="" src="${qrPng(s.code,112)}"></td><td class="${stCls(s.status)}">${esc(stTxt(s.status))}</td><td><button class="x" type="button" data-del="${i}" aria-label="×">×</button></td></tr>`); }
+    rows.push(`<tr><td>${i+1}</td>${L.headers.map(h=>`<td>${esc(vals(s)[h]??'')}</td>`).join('')}<td class="q"><img alt="" src="${qrPng(s.code,112)}"></td><td class="${stCls(s.status)}">${esc(stTxt(s.status))}</td><td>${esc(new Date(s.ts).toLocaleTimeString(lang==='en'?'en-US':'es-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}))}</td><td><button class="x" type="button" data-del="${i}" aria-label="×">×</button></td></tr>`); }
   $('tb').innerHTML=rows.join('');
 }
 
@@ -297,14 +297,15 @@ function sheetXml(rows,{cols,heights,freeze,filter,drawing,merge}){
   if(drawing) x+='<drawing r:id="rId1"/>'; return x+'</worksheet>'; }
 async function download(){
   if(!L) return; const z=new JSZip(), now=new Date(), H=L.headers, dstr=now.toLocaleDateString(lang==='en'?'en-US':'es-US');
-  const fixed=['#',t('FECHA'),t('HORA'),t('CAMIÓN / REMISIÓN')], hdr=[...fixed,...H,t('QR'),t('ESTADO')], qrCol=hdr.length-2;
+  const fixed=['#',t('CAMIÓN / REMISIÓN')], hdr=[...fixed,...H,t('QR'),t('ESTADO'),t('FECHA'),t('HORA')], qrCol=fixed.length+H.length;
   const numK=new Set(['qty','wt','sa','sno']);
   const R=[[{v:[L.project,L.name].filter(Boolean).join(' · ')+' — '+t('DESPACHO').toUpperCase(),s:1}],[t('Fecha')+': '+dstr+(truck?'   ·   '+t('CAMIÓN / REMISIÓN')+': '+truck:'')],[],hdr.map(h=>({v:h,s:2}))];
   const hts={3:30}, pics=[], media=new Map();
   S.forEach((s,i)=>{ const l=s.li>=0?L.lines[s.li]:null, d=new Date(s.ts);
-    const row=[{v:i+1,s:3},{v:d.toLocaleDateString(lang==='en'?'en-US':'es-US'),s:3},{v:d.toLocaleTimeString(lang==='en'?'en-US':'es-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),s:3},{v:s.truck||'',s:3}];
+    const row=[{v:i+1,s:3},{v:s.truck||'',s:3}];
     const VV=vals(s); H.forEach(h=>{ const v=VV[h]??''; row.push({v:v===''||v==null?'':v,s:typeof v==='number'&&(kind(h)==='wt'||kind(h)==='sa')?7:3}); });
     row.push({v:'',s:3}); row.push({v:stTxt(s.status),s:s.status==='ok'?4:s.status==='warn'?5:6});
+    row.push({v:d.toLocaleDateString(lang==='en'?'en-US':'es-US'),s:3}); row.push({v:d.toLocaleTimeString(lang==='en'?'en-US':'es-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),s:3});
     R.push(row); const ri=R.length-1; hts[ri]=62;
     if(!media.has(s.code)) media.set(s.code,'qr'+(media.size+1)+'.png'); pics.push({r:ri,c:qrCol,img:media.get(s.code)}); });
   // fila de totales
@@ -313,7 +314,7 @@ async function download(){
   if(iw>=0) tot[fixed.length+iw]={v:Math.round(tw*100)/100,s:8}; if(ia>=0) tot[fixed.length+ia]={v:Math.round(ta*100)/100,s:8};
   const iq=H.findIndex(h=>kind(h)==='qty'); tot[fixed.length+(iq>=0?iq:0)]= {v:S.filter(s=>s.status==='ok'||s.status==='warn').length,s:8}; R.push([]); R.push(tot);
   const wid=h=>{ const k=kind(h); return k==='desc'?20:k==='mark'?18:k==='len'?13:k==='tipo2'?13:k==='tipo'?14:k==='coat'?12:k==='wt'||k==='sa'?12:9; };
-  const cols=[5,11,11,18,...H.map(wid),11,18];
+  const cols=[5,16,...H.map(wid),11,18,11,12];
   // resumen por línea
   const RS=[[{v:[L.project,L.name].filter(Boolean).join(' · ')+' — '+t('Resumen').toUpperCase(),s:1}],[],[ t('HOJA'),...H,t('DESPACHADO'),t('PENDIENTE')].map(h=>({v:h,s:2}))];
   L.lines.forEach((l,i)=>{ const n=shipped(i), p=Math.max(0,l.qty-n); RS.push([{v:l.sheet,s:3},...H.map(h=>({v:l.v[h]??'',s:3})),{v:n,s:n>=l.qty?4:n>0?5:3},{v:p,s:p?3:4}]); });
