@@ -155,6 +155,11 @@ details.sec>div{padding-top:10px;display:flex;flex-direction:column;gap:10px}
             <input type="password" id="ghToken" autocomplete="off" placeholder="github_pat_…" style="width:100%;box-sizing:border-box;padding:8px;font:inherit">
             <div class="row" style="margin-top:8px;align-items:center"><button type="button" id="ghPub">Publicar visor en GitHub</button><span class="hint" id="ghInfo" aria-live="polite"></span></div>
           </div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
+            <b>Agregar al Excel de avance</b>
+            <span class="hint">Elige el Excel de avance (BOM_Connection_Type) de cada unidad. Sale una copia con los troqueles en la columna Piece Die Stamp (la letra arriba de «PIECE DIE STAMP (BOM)» en Welding Progress) y las pestañas nuevas LISTA DE TROQUELADOS, PR SAP y PLAN DE CORTE. Lo demás del Excel no se toca.</span>
+            <div class="row" style="margin-top:8px;align-items:center"><label class="ghost" style="cursor:pointer;display:inline-block;padding:8px 12px;border:1px solid var(--line)">Elegir Excel de avance<input type="file" id="avFile" accept=".xlsx,.xlsm" multiple hidden></label><span class="hint" id="avInfo" aria-live="polite"></span></div>
+          </div>
         </div>
       </div>
       <div class="group">
@@ -1986,6 +1991,7 @@ async function download(){
   blob=new Blob([raw],{type:XT});
   try{ if(imgs.length){ toast('Dibujando perfiles y láminas…'); blob=await addImagesToXlsx(raw,imgs,XT); } }
   catch(e){ console.error(e); toast('El Excel sale sin dibujos: no se pudieron agregar.'); }
+  if(window.__ocCapture){ const f=window.__ocCapture; window.__ocCapture=null; f(blob); return; }
   const name=OUTNAME||('Compra_'+(sourceName||'BOM').replace(/\.[^.]+$/,'')+'.xlsx');
   let dl=null; try{ dl=window.claude&&window.claude.use?await window.claude.use('downloads'):null; }catch(e){ dl=null; }
   if(dl){ try{ await dl.save({filename:name,data:blob}); toast('Excel guardado.'); }catch(e){ toast(e&&e.code==='declined'?'Descarga cancelada.':e&&e.code==='rate_limited'?'Ya hay una descarga pendiente.':'No se pudo descargar aquí. Abre la copia HTML en tu PC.'); } return; }
@@ -2628,6 +2634,7 @@ function buildBook(P,opt){
   // troqueles: consecutivos en todo el proyecto (un número por marca); piezas chicas = nombre de la marca
   let stN=0; blocks.forEach(b=>b.lines.forEach(x=>{ const man=stampOf((x.unit?x.unit+' · ':'')+x.am);
     x.st=x.small?shortMark(x.mark).toUpperCase():(man||(LET+(++stN))); }));
+  if(opt.onlyUnit){ const keep=blocks.filter(b=>b.unit===opt.onlyUnit); blocks.length=0; keep.forEach(b=>blocks.push(b)); }
   const vurl=visorURL();
   const HQ=['STAMP','PIEZA','S.NO.','MARK','QTY.','DESCRIPTION','SIMPLE/COMPU','TIPO','COATING','LENGTH','WEIGHT (lb)','SURFACE (ft²)','DRAWING'].concat(vurl?['QR']:[]).map(v=>({v,s:'h'}));
   const NC=HQ.length, W$=v=>v===null||v===undefined?'':{v:Math.round(v*100)/100,z:'#,##0.00'};
@@ -2658,7 +2665,7 @@ function buildBook(P,opt){
     const off=R.length;
     sheets.push({name:'LISTA DE TROQUELADOS',aoa:R.concat(body),cols:[20,11,10,18,16,20,13,16,12,13,12,12,26].concat(vurl?[12]:[]),band:true,stamp:true,grp:'troq',breaks:[off].concat(breaks.map(r=>r+off)).filter((r,i)=>i>0||off>0)}); }
   window.__tq={blocks:blocks.length,stN,pieces:gN};
-  window.__tqSt=new Map(); blocks.forEach(b=>b.lines.forEach(x=>{ if(x.main) window.__tqSt.set((x.unit?x.unit+' · ':'')+x.am,x.st); }));
+  if(!opt.onlyUnit){ window.__tqSt=new Map(); window.__tqU=new Map(); blocks.forEach(b=>b.lines.forEach(x=>{ if(x.main) window.__tqSt.set((x.unit?x.unit+' · ':'')+x.am,x.st); const u=x.unit||''; if(!window.__tqU.has(u)) window.__tqU.set(u,new Map()); window.__tqU.get(u).set(normMark(x.am),{st:x.st,small:x.small,mark:x.am}); })); }
   // pernos
   if(opt.bolts&&opt.bolts.rows.length) sheets.push(boltSheet(opt.bolts,code,opt.pname||P.meta.project||code));
 
@@ -4113,6 +4120,149 @@ function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTime
 load(RAW_SAMPLE,'BESS Area PDC and Transformer','Ejemplo: BESS Assembly List BOM (US068-SBSB-ENGCIV-BOM-0011, 86 assemblies)');
 </script>
 
+
+<script>
+/* ---------- Agregar al Excel de avance (BOM_Connection_Type de cada unidad) ----------
+   No cambia nada de lo que ya tiene el Excel: solo
+   · llena la columna «Piece Die Stamp» de la hoja BOM (hoy vacía) con el troquel de cada pieza; la letra queda arriba de
+     «PIECE DIE STAMP (BOM)» en WELDING PROGRESS (L19) y los números con fórmula = letra & número, así si cambias la letra cambian todos;
+   · agrega las pestañas LISTA DE TROQUELADOS (solo esa unidad, numeración del proyecto), PR SAP (todo el proyecto) y PLAN DE CORTE.
+   Welding Progress, 3D CONTROL y Painting ya leen esa columna, así que el troquel les llega solo. */
+(function(){
+  const $$=id=>document.getElementById(id);
+  const xe=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const colN=ref=>{ const m=/^([A-Z]+)/.exec(ref); let n=0; for(const c of m[1]) n=n*26+c.charCodeAt(0)-64; return n; };
+  async function sheetsBin(list){ const wb=XLSX.utils.book_new(); list.forEach(s=>XLSX.utils.book_append_sheet(wb,toSheet(s),s.name)); wb.Workbook={Sheets:list.map(s=>({name:s.name,Hidden:0}))};
+    let bin=XLSX.write(wb,{bookType:'xlsx',type:'array',compression:false}); try{ bin=await patchXlsx(bin,list); }catch(e){ console.warn('patch',e); } return bin; }
+  async function cutBin(){ if(!window.OC||!OC.ready) return null; return await new Promise(res=>{ const t=setTimeout(()=>{ window.__ocCapture=null; res(null); },180000); window.__ocCapture=b=>{ clearTimeout(t); res(b); }; try{ OC.download(); }catch(e){ clearTimeout(t); res(null); } }); }
+  // ---- estilos: se agregan los del libro nuevo al final de los del Excel (los existentes no cambian) ----
+  const sec=(x,tag)=>{ const m=new RegExp('<'+tag+'\\b[^>]*?(?:/>|>([\\s\\S]*?)</'+tag+'>)').exec(x); return m?{all:m[0],inner:m[1]||'',idx:m.index}:null; };
+  const items=(inner,tag)=>inner.match(new RegExp('<'+tag+'\\b[^>]*/>|<'+tag+'\\b[^>]*>[\\s\\S]*?</'+tag+'>','g'))||[];
+  function mergeStyles(tgt,src){
+    const put=(x,tag,child,add)=>{ const s0=sec(x,tag); if(!s0){ return x.replace('</styleSheet>',`<${tag} count="${add.length}">${add.join('')}</${tag}>`+'</styleSheet>'); } const all=items(s0.inner,child).concat(add);
+      return x.slice(0,s0.idx)+`<${tag} count="${all.length}">${all.join('')}</${tag}>`+x.slice(s0.idx+s0.all.length); };
+    const n=(x,tag,child)=>{ const s0=sec(x,tag); return s0?items(s0.inner,child).length:0; };
+    const nF=n(tgt,'fonts','font'), nFi=n(tgt,'fills','fill'), nB=n(tgt,'borders','border'), nX=n(tgt,'cellXfs','xf');
+    // formatos numéricos propios (≥164): se reusan si ya existen con el mismo código
+    const tN=sec(tgt,'numFmts'), tF=tN?items(tN.inner,'numFmt'):[], byCode={}; let maxId=163;
+    tF.forEach(f=>{ const id=+(/numFmtId="(\d+)"/.exec(f)||[])[1], c=(/formatCode="([^"]*)"/.exec(f)||[])[1]; byCode[c]=id; maxId=Math.max(maxId,id); });
+    const sN=sec(src,'numFmts'), fmap={}, newF=[]; (sN?items(sN.inner,'numFmt'):[]).forEach(f=>{ const id=+(/numFmtId="(\d+)"/.exec(f)||[])[1], c=(/formatCode="([^"]*)"/.exec(f)||[])[1];
+      if(byCode[c]!==undefined) fmap[id]=byCode[c]; else { const ni=++maxId; byCode[c]=ni; fmap[id]=ni; newF.push(`<numFmt numFmtId="${ni}" formatCode="${c}"/>`); } });
+    let x=tgt; if(newF.length) x=put(x,'numFmts','numFmt',newF);
+    x=put(x,'fonts','font',items((sec(src,'fonts')||{inner:''}).inner,'font'));
+    x=put(x,'fills','fill',items((sec(src,'fills')||{inner:''}).inner,'fill'));
+    x=put(x,'borders','border',items((sec(src,'borders')||{inner:''}).inner,'border'));
+    const sx=items((sec(src,'cellXfs')||{inner:''}).inner,'xf').map(xf=>xf.replace(/fontId="(\d+)"/,(m,a)=>`fontId="${+a+nF}"`).replace(/fillId="(\d+)"/,(m,a)=>`fillId="${+a+nFi}"`).replace(/borderId="(\d+)"/,(m,a)=>`borderId="${+a+nB}"`).replace(/numFmtId="(\d+)"/,(m,a)=>`numFmtId="${+a>=164?(fmap[+a]??0):+a}"`).replace(/xfId="\d+"/,'xfId="0"'));
+    x=put(x,'cellXfs','xf',sx);
+    return {xml:x,map:i=>nX+i}; }
+  // ---- copia hojas (con sus dibujos) de un libro a otro ----
+  async function copySheets(T,S,names,rename,styleMap,state){
+    const sw=await S.file('xl/workbook.xml').async('string'), srel=await S.file('xl/_rels/workbook.xml.rels').async('string');
+    const rid={}; (sw.match(/<sheet\b[^>]*>/g)||[]).forEach(t=>{ rid[(/name="([^"]*)"/.exec(t)||[])[1]]=(/r:id="([^"]*)"/.exec(t)||[])[1]; });
+    const tg={}; (srel.match(/<Relationship\b[^>]*>/g)||[]).forEach(t=>{ tg[(/Id="([^"]*)"/.exec(t)||[])[1]]=(/Target="([^"]*)"/.exec(t)||[])[1]; });
+    const out=[];
+    for(const nm of names){ const r=rid[xe(nm)]||rid[nm]; if(!r) continue; const path='xl/'+tg[r].replace(/^\/?(xl\/)?/,''); const f=S.file(path); if(!f) continue;
+      let x=await f.async('string');
+      x=x.replace(/(<c\b[^>]*?\bs=")(\d+)(")/g,(m,a,b,c)=>a+styleMap(+b)+c).replace(/(<row\b[^>]*?\bs=")(\d+)(")/g,(m,a,b,c)=>a+styleMap(+b)+c).replace(/(<col\b[^>]*?\bstyle=")(\d+)(")/g,(m,a,b,c)=>a+styleMap(+b)+c);
+      const sn=++state.sheet, newPath=`xl/worksheets/sheet${sn}.xml`;
+      const relF=S.file(path.replace(/([^/]+)$/,'_rels/$1.rels'));
+      if(relF){ let rx=await relF.async('string'); const dm=/Target="([^"]*drawings\/drawing\d+\.xml)"/.exec(rx);
+        if(dm){ const dPath='xl/drawings/'+dm[1].split('/').pop(), dn=++state.drawing, nd=`drawing${dn}.xml`;
+          let dx=await S.file(dPath).async('string'), drel=S.file(dPath.replace(/([^/]+)$/,'_rels/$1.rels')); let drx=drel?await drel.async('string'):'';
+          for(const mm of (drx.match(/Target="\.\.\/media\/[^"]+"/g)||[])){ const old=mm.slice(17,-1), mf=S.file('xl/media/'+old); if(!mf) continue; const ext=old.split('.').pop(), nn=`tq${++state.media}.${ext}`;
+            T.file('xl/media/'+nn,await mf.async('uint8array')); drx=drx.split('../media/'+old+'"').join('../media/'+nn+'"'); }
+          T.file('xl/drawings/'+nd,dx); T.file('xl/drawings/_rels/'+nd+'.rels',drx); state.ct.push(`<Override PartName="/xl/drawings/${nd}" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`);
+          rx=rx.replace(dm[1],'../drawings/'+nd); }
+        T.file(newPath.replace(/([^/]+)$/,'_rels/$1.rels'),rx); }
+      T.file(newPath,x); state.ct.push(`<Override PartName="/${newPath}" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
+      out.push({name:rename(nm),path:newPath}); }
+    return out; }
+  // ---- la hoja BOM: marca y tipo de renglón (A ensamble, H suelta) por fila ----
+  function sstOf(x){ return (x.match(/<si>[\s\S]*?<\/si>/g)||[]).map(si=>(si.match(/<t\b[^>]*>([\s\S]*?)<\/t>/g)||[]).map(t=>t.replace(/<[^>]+>/g,'')).join('').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'")); }
+  function cellText(c,sst){ const t=(/\bt="([^"]*)"/.exec(c)||[])[1], v=(/<v>([\s\S]*?)<\/v>/.exec(c)||[])[1]; if(t==='s') return sst[+v]||''; if(t==='inlineStr') return ((/<t\b[^>]*>([\s\S]*?)<\/t>/.exec(c)||[])[1]||''); return v||''; }
+  function setCell(rowXml,ref,cellXml){ const re=new RegExp('<c r="'+ref+'"(?:[^>]*/>|[^>]*>[\\s\\S]*?</c>)'); if(re.test(rowXml)) return rowXml.replace(re,m=>{ const s=(/\bs="(\d+)"/.exec(m)||[])[1]; return cellXml.replace('<c ',`<c ${s?`s="${s}" `:''}`); });
+    const n=colN(ref); const cells=rowXml.match(/<c r="[A-Z]+\d+"/g)||[]; const after=cells.find(c=>colN(c.slice(6))>n);
+    if(after){ const i=rowXml.indexOf(after); return rowXml.slice(0,i)+cellXml+rowXml.slice(i); } return rowXml.replace(/<\/row>$/,cellXml+'</row>'); }
+  async function addToAvance(file,info){
+    if(typeof P==='undefined'||!P||!book){ info('Primero carga los BOM, el IFC y el Bolt Summary del proyecto.'); return; }
+    if(typeof JSZip==='undefined'){ info('No cargó el lector de Excel (JSZip). Revisa la conexión.'); return; }
+    info('Leyendo el Excel de avance…'); const T=await JSZip.loadAsync(await file.arrayBuffer());
+    const wx=await T.file('xl/workbook.xml').async('string'), wr=await T.file('xl/_rels/workbook.xml.rels').async('string');
+    const sheetsT=(wx.match(/<sheet\b[^>]*>/g)||[]).map(t=>({name:(/name="([^"]*)"/.exec(t)||[])[1].replace(/&amp;/g,'&').replace(/&apos;/g,"'"),rid:(/r:id="([^"]*)"/.exec(t)||[])[1],id:+(/sheetId="(\d+)"/.exec(t)||[])[1]}));
+    const tgtOf={}; (wr.match(/<Relationship\b[^>]*>/g)||[]).forEach(t=>{ tgtOf[(/Id="([^"]*)"/.exec(t)||[])[1]]='xl/'+(/Target="([^"]*)"/.exec(t)||[])[1].replace(/^\/?(xl\/)?/,''); });
+    const bomS=sheetsT.find(s=>/^BOM\b/i.test(s.name)&&/CONNECTION/i.test(s.name))||sheetsT.find(s=>/^BOM\b/i.test(s.name)); if(!bomS){ info('Ese Excel no tiene la hoja «BOM … CONNECTION».'); return; }
+    if(sheetsT.some(s=>s.name==='LISTA DE TROQUELADOS')){ info('Ese Excel ya tiene la LISTA DE TROQUELADOS. Usa el Excel original (sin troqueles).'); return; }
+    const sstF=T.file('xl/sharedStrings.xml'), sst=sstF?sstOf(await sstF.async('string')):[];
+    const bomPath=tgtOf[bomS.rid]; let bx=await T.file(bomPath).async('string');
+    // filas A/H (columna AP) con su marca (columna B)
+    const rows=[]; bx.replace(/<row r="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(m,r)=>{ const cell=col=>{ const c=(new RegExp('<c r="'+col+r+'"(?:[^>]*/>|[^>]*>[\\s\\S]*?</c>)').exec(m)||[])[0]; return c?cellText(c,sst).trim():''; };
+      const ty=cell('AP'); if(ty==='A'||ty==='H') rows.push({r:+r,mark:cell('B'),ty}); return m; });
+    if(!rows.length){ info('No encontré las filas de piezas en la hoja BOM (columna AP).'); return; }
+    // ¿qué unidad es este Excel? la que tenga más marcas en común
+    let unit='', best=-1; (window.__tqU||new Map()).forEach((m,u)=>{ const k=rows.filter(x=>m.has(normMark(x.mark))).length; if(k>best){ best=k; unit=u; } });
+    const SM=(window.__tqU||new Map()).get(unit)||new Map(); if(!best||best<1){ info('Las marcas de ese Excel no están en los BOM cargados. ¿Es del mismo proyecto?'); return; }
+    // columna Piece Die Stamp (Z): letra (WELDING PROGRESS!L19) & número; piezas chicas = nombre de la marca
+    const LET=(($$('stLetter')||{}).value||'C').toUpperCase().replace(/[^A-Z]/g,'')||'C', wpS=sheetsT.find(s=>/^WELDING PROGRESS$/i.test(s.name));
+    const letRef=wpS?`'${wpS.name.replace(/'/g,"''")}'!$L$19`:null; let nSt=0; const zByMark=new Map();
+    rows.forEach(x=>{ const v=SM.get(normMark(x.mark)); if(!v) return; let cx;
+      if(v.small||!letRef||!/^[A-Z]+\d+$/.test(v.st)) cx=`<c r="Z${x.r}" t="inlineStr"><is><t>${xe(v.st)}</t></is></c>`;
+      else { const num=v.st.replace(/^[A-Z]+/,''); cx=`<c r="Z${x.r}" t="str"><f>${xe(letRef+'&"'+num+'"')}</f><v>${xe(LET+num)}</v></c>`; }
+      bx=bx.replace(new RegExp('(<row r="'+x.r+'"[^>]*>)([\\s\\S]*?</row>)'),(m,a,b)=>a+setCell(b,'Z'+x.r,cx)); nSt++; if(!zByMark.has(normMark(x.mark))) zByMark.set(normMark(x.mark),x.r); });
+    T.file(bomPath,bx);
+    // valor ya calculado en las hojas que leen esa columna (WELDING PROGRESS, 3D CONTROL…), para que el tablero muestre el troquel aunque el Excel no se haya abierto y guardado
+    const stByRow=new Map(); rows.forEach(x=>{ const v=SM.get(normMark(x.mark)); if(v) stByRow.set(x.r,v.small||!/^[A-Z]+\d+$/.test(v.st)?v.st:LET+v.st.replace(/^[A-Z]+/,'')); });
+    const unx=t=>t.replace(/&apos;/g,"'").replace(/&quot;/g,'"').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+    // fórmulas «IF('Hoja'!X<>"",'Hoja'!X,"")» que leen el troquel (directo del BOM o de otra hoja que lo lee): se les pone el valor (dos pasadas)
+    const VAL=new Map(); stByRow.forEach((v,r)=>VAL.set(bomS.name+'!Z'+r,v));
+    for(let pass=0;pass<2;pass++) for(const sh of sheetsT){ if(sh===bomS) continue; const pth=tgtOf[sh.rid], f=T.file(pth); if(!f) continue; let x=await f.async('string'); let k=0;
+      x=x.replace(/<c r="([A-Z]+\d+)"([^>]*)><f([^>]*)>([^<]*)<\/f>(?:<v>[^<]*<\/v>|<v\/>)?<\/c>/g,(m,ref,at,fa,fx)=>{ const F=unx(fx);
+        // cadena IF('A'!x<>"",'A'!x,IF('B'!y<>"",'B'!y,"")): se toma el primer valor conocido
+        const RX=/IF\('((?:[^']|'')+)'!\$?([A-Z]+)\$?(\d+)<>"",'(?:[^']|'')+'!\$?[A-Z]+\$?\d+,/g; const refs=[...F.matchAll(RX)]; if(!refs.length||F.replace(RX,'').replace(/^""\)+$/,'')!=='') return m;
+        let v=null; for(const q of refs){ const z=VAL.get(q[1].replace(/''/g,"'")+'!'+q[2]+q[3]); if(z!=null){ v=z; break; } } if(v==null) return m;
+        VAL.set(sh.name+'!'+ref,v); k++; return `<c r="${ref}"${at.replace(/\s*t="[^"]*"/,'')} t="str"><f${fa}>${fx}</f><v>${xe(v)}</v></c>`; });
+      if(k) T.file(pth,x); }
+    if(wpS){ const wpPath=tgtOf[wpS.rid]; let w=await T.file(wpPath).async('string');
+      const cells=`<c r="K19" t="inlineStr"><is><t>Letra del troquel →</t></is></c><c r="L19" t="inlineStr"><is><t>${xe(LET)}</t></is></c>`;
+      if(/<row r="19"[\s>]/.test(w)) w=w.replace(/(<row r="19"[^>]*>)([\s\S]*?<\/row>)/,(m,a,b)=>a+setCell(setCell(b,'K19',`<c r="K19" t="inlineStr"><is><t>Letra del troquel →</t></is></c>`),'L19',`<c r="L19" t="inlineStr"><is><t>${xe(LET)}</t></is></c>`));
+      else w=w.replace(/<row r="20"[\s>]/,m=>`<row r="19">${cells}</row>`+m);
+      T.file(wpPath,w); }
+    // libros nuevos: lista de troquelados (solo esta unidad), PR SAP (todo el proyecto) y plan de corte
+    info('Armando la lista de troquelados de '+(unit||'la unidad')+'…');
+    const o=Object.assign(opts(),{onlyUnit:unit||null}); const bk=buildBook(P,o); try{ build(); }catch(e){}
+    const troq=bk.sheets.filter(s=>s.grp==='troq'); const pr=prSheets();
+    const tBin=await sheetsBin(troq), pBin=pr.length?await sheetsBin(pr):null;
+    info('Dibujando el plan de corte…'); const cBlob=await cutBin();
+    const state={sheet:Math.max(0,...Object.keys(T.files).map(n=>+(/^xl\/worksheets\/sheet(\d+)\.xml$/.exec(n)||[])[1]||0)),drawing:Math.max(0,...Object.keys(T.files).map(n=>+(/^xl\/drawings\/drawing(\d+)\.xml$/.exec(n)||[])[1]||0)),media:0,ct:[]};
+    let stx=await T.file('xl/styles.xml').async('string'); const added=[];
+    const addFrom=async(bin,names,rename)=>{ if(!bin) return; const S=await JSZip.loadAsync(bin); const ms=mergeStyles(stx,await S.file('xl/styles.xml').async('string')); stx=ms.xml; (await copySheets(T,S,names,rename,ms.map,state)).forEach(x=>added.push(x)); };
+    await addFrom(tBin,troq.map(s=>s.name),n=>n);
+    if(pBin) await addFrom(pBin,pr.map(s=>s.name),n=>'PR SAP'+(pr.length>1?' '+n.replace(/^PR\s*/,''):''));
+    if(cBlob){ const S=await JSZip.loadAsync(cBlob); const sw=await S.file('xl/workbook.xml').async('string'); const nms=(sw.match(/<sheet\b[^>]*>/g)||[]).map(t=>(/name="([^"]*)"/.exec(t)||[])[1]).filter(n=>/^Plan de corte$|^Láminas dibujo$/i.test(n));
+      await addFrom(cBlob,nms,n=>/^Plan/i.test(n)?'PLAN DE CORTE':'PLAN DE CORTE LÁMINAS'); }
+    T.file('xl/styles.xml',stx);
+    // en la lista, el STAMP lee la columna Z del BOM (si cambias la letra o un troquel en el BOM, cambia aquí)
+    const L=added.find(a=>a.name==='LISTA DE TROQUELADOS'); if(L){ let lx=await T.file(L.path).async('string'); const bomRef=`'${bomS.name.replace(/'/g,"''")}'!`;
+      lx=lx.replace(/<row r="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(m,r)=>{ const d=(new RegExp('<c r="D'+r+'"[^>]*>[\\s\\S]*?</c>').exec(m)||[])[0]; if(!d) return m; const mk=((/<v>([\s\S]*?)<\/v>/.exec(d)||/<t\b[^>]*>([\s\S]*?)<\/t>/.exec(d)||[])[1]||'').replace(/&amp;/g,'&');
+        const zr=zByMark.get(normMark(mk)); if(!zr) return m; return m.replace(new RegExp('<c r="A'+r+'"([^>]*?)(?:/>|>[\\s\\S]*?</c>)'),(c,at)=>{ const v=(/<v>([\s\S]*?)<\/v>/.exec(c)||[])[1]||''; return `<c r="A${r}"${at.replace(/\s*t="[^"]*"/,'')} t="str"><f>${xe(bomRef+'Z'+zr)}</f><v>${v}</v></c>`; }); });
+      T.file(L.path,lx); }
+    // libro: pestañas nuevas al final, y que Excel recalcule al abrir (fórmulas nuevas)
+    let w2=wx, rel2=wr; let maxR=Math.max(0,...(wr.match(/Id="rId(\d+)"/g)||[]).map(t=>+t.replace(/\D/g,''))), maxS=Math.max(0,...sheetsT.map(s=>s.id));
+    const sx=added.map(a=>{ const rid='rId'+(++maxR); rel2=rel2.replace('</Relationships>',`<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="${a.path.replace(/^xl\//,'')}"/></Relationships>`); return `<sheet name="${xe(a.name)}" sheetId="${++maxS}" state="visible" r:id="${rid}"/>`; }).join('');
+    w2=w2.replace('</sheets>',sx+'</sheets>');
+    w2=/<calcPr\b/.test(w2)?w2.replace(/<calcPr\b([^>]*?)(\/?)>/,(m,a,b)=>`<calcPr${a.replace(/\s*fullCalcOnLoad="[^"]*"/,'')} fullCalcOnLoad="1"${b}>`):w2.replace('</workbook>','<calcPr fullCalcOnLoad="1"/></workbook>');
+    T.file('xl/workbook.xml',w2); T.file('xl/_rels/workbook.xml.rels',rel2);
+    let ct=await T.file('[Content_Types].xml').async('string'); if(!/Extension="png"/i.test(ct)) ct=ct.replace('<Default ','<Default Extension="png" ContentType="image/png"/><Default '); ct=ct.replace('</Types>',state.ct.join('')+'</Types>'); T.file('[Content_Types].xml',ct);
+    info('Comprimiendo…');
+    const blob=await T.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const name=file.name.replace(/\.xlsx?$/i,'')+'_con troquel.xlsx';
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },3000);
+    info(`Listo: ${name} · ${unit||'unidad'} · ${nSt} troqueles en la columna Piece Die Stamp · pestañas nuevas: ${added.map(a=>a.name).join(', ')}.`);
+    return {unit,stamps:nSt,added:added.map(a=>a.name)}; }
+  window.addToAvance=addToAvance;
+  const inp=$$('avFile'), info=t=>{ const el=$$('avInfo'); if(el) el.textContent=t; };
+  if(inp) inp.addEventListener('change',async e=>{ const fs=[...e.target.files]; e.target.value=''; for(const f of fs){ try{ await addToAvance(f,info); }catch(err){ console.error(err); info('No se pudo: '+(err&&err.message||err)); } } });
+})();
+</script>
 
 <script>
 /* ---------- Publicar visor en GitHub: usa la plantilla ../visor/ (mismo sitio) escondida en un iframe ---------- */
