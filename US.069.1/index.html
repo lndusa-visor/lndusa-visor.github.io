@@ -244,6 +244,8 @@ function render(){
     const stamp=(lbl,val)=>{ const b=document.createElement('div'); b.className='stamp'; b.innerHTML='<span></span><b></b>'; b.querySelector('span').textContent=lbl; b.querySelector('b').textContent=val; return b; };
     const sw=document.createElement('div'); sw.className='row'; sw.style.gap='8px';
     if(UNITS&&f.u) sw.appendChild(stamp('Unidad',f.u)); if(st) sw.appendChild(stamp('Troquel',st));
+    // número de pieza (…~MARCA~TROQUEL~UNIDAD~2-4 → «2 de 4»): piezas repetidas, un QR por pieza
+    let pz=''; try{ const m=(decodeURIComponent(h).split('~')[3]||'').match(/^(\d+)-(\d+)$/); if(m) pz=m[1]+((window.I18N&&I18N.lang==='en')?' of ':' de ')+m[2]; }catch(e){} if(pz) sw.appendChild(stamp('Pieza',pz));
     const qn=f.asm?f.asm.qty:(f.simple&&f.loc&&f.loc.qty)||f.part.qty; if(qn) sw.appendChild(stamp(f.asm||f.simple?'Cantidad':'Cant. total',String(qn)));
     if(sw.children.length) v.querySelector('h2').after(sw); window.scrollTo(0,0);
     hydrate(v); v.querySelectorAll('.v3').forEach(mount3D); return; }
