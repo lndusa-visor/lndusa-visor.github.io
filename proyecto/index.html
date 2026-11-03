@@ -3151,7 +3151,7 @@ function ifcGeometry(text){
   const bolts=[];
   for(const [i,[ty,a]] of ent) if(ty==='IFCMECHANICALFASTENER'){ const s=split(a); const W=place(refs(s[5])[0]); const d=+s[8]||19;
     repItems(refs(s[6])[0]).forEach(({faces,M})=>{ const vs=faces.flat(); if(!vs.length) return; const mn=[0,1,2].map(k=>Math.min(...vs.map(v=>v[k]))), mx=[0,1,2].map(k=>Math.max(...vs.map(v=>v[k]))); const ext=mx.map((x,k)=>x-mn[k]); const k=ext.indexOf(Math.max(...ext)); const c=mn.map((x,j)=>(x+mx[j])/2);
-      const p1=c.slice(), p2=c.slice(); p1[k]=mn[k]; p2[k]=mx[k]; const G=mul(W,M); bolts.push({id:i,a:apply(G,p1),b:apply(G,p2),d}); }); }
+      const p1=c.slice(), p2=c.slice(); p1[k]=mn[k]; p2[k]=mx[k]; const G=mul(W,M); bolts.push({id:i,loc:bloc.get(i)||'',a:apply(G,p1),b:apply(G,p2),d}); }); }
   // partes: una por marca
   const parts=new Map(), inst=new Map();
   for(const [i,[ty,a]] of ent){ if(!/^IFC(BEAM|COLUMN|MEMBER|PLATE)$/.test(ty)) continue;   // sin Pset Reference: la marca viene en el Tag
@@ -3180,7 +3180,7 @@ function ifcGeometry(text){
         return t0<=t1; }))) bolted.add(x.mark); });
     assemblies.set(am,{mark:am,name:str(hs[2]),members:mem,bolted:[...bolted]});
     if(mem.length>1) [...new Set(mem.map(x=>x.mark))].forEach(mk=>{ const p=parts.get(mk); if(p&&!p.asm.includes(am)) p.asm.push(am); }); }
-  parts.assemblies=assemblies; parts.instances=[...inst.values()];
+  parts.assemblies=assemblies; parts.instances=[...inst.values()]; parts.bolts=bolts;
   return parts;
 }
 
