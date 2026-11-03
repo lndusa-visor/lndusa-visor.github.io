@@ -51,10 +51,12 @@ input[type=text]{font:16px var(--body);padding:10px;border:1px solid var(--line)
 #msg small{display:block;font-weight:400;color:var(--ink);margin-top:4px;font-family:var(--mono);word-break:break-all}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);background:var(--card)}
 table{border-collapse:collapse;width:100%;font-size:13px}
-th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;white-space:nowrap;vertical-align:middle}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:center;white-space:nowrap;vertical-align:middle}
 th{font:600 11px var(--mono);text-transform:uppercase;color:var(--mut);background:var(--bg);position:sticky;top:0}
-td.d img{height:56px;width:auto;display:block}
-td.q img{width:56px;height:56px;display:block;image-rendering:pixelated}
+td.d img{height:56px;width:auto;display:block;margin:0 auto}
+.pal .palh{font:700 18px var(--body);margin-bottom:8px}.palt{text-align:center;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.palt div{background:var(--bg);padding:10px}.palt b{display:block;font:700 20px var(--mono)}.palt span{font-size:12px;color:var(--mut)}
+.palq{display:flex;flex-direction:column;gap:10px;align-items:center;text-align:center;margin-top:12px}.palq img{width:180px;height:180px;image-rendering:pixelated;background:#fff;padding:6px}.pal.tot{border-color:var(--acc)}
+td.q img{width:56px;height:56px;display:block;margin:0 auto;image-rendering:pixelated}
 td .x{all:unset;cursor:pointer;padding:6px 10px;color:var(--bad);font-weight:700}
 .st-ok{color:var(--ok);font-weight:700}.st-warn{color:var(--warn);font-weight:700}.st-bad{color:var(--bad);font-weight:700}
 #cam{position:fixed;inset:0;background:#000;z-index:100;display:none;flex-direction:column}
@@ -112,6 +114,7 @@ td .x{all:unset;cursor:pointer;padding:6px 10px;color:var(--bad);font-weight:700
       </div>
     </div>
     <div class="tw"><table><thead id="th"></thead><tbody id="tb"></tbody></table></div>
+    <div id="pals"></div>
     <p class="mut" style="margin-top:8px" data-t="Los escaneos se guardan en este teléfono hasta que empieces un nuevo despacho."></p>
   </section>
 </main>
@@ -125,7 +128,7 @@ td .x{all:unset;cursor:pointer;padding:6px 10px;color:var(--bad);font-weight:700
 
 <script src="lib/jszip.min.js"></script>
 <script src="lib/jsQR.js"></script>
-<script src="lib/qrenc.js"></script>
+<script src="lib/qrcode.js"></script>
 <script>
 (function(){
 const $=id=>document.getElementById(id);
@@ -144,7 +147,7 @@ const EN={'Despacho':'Shipping','Despacho de piezas':'Piece shipping',
  'FECHA':'DATE','HORA':'TIME','CAMIÓN / REMISIÓN':'TRUCK / DELIVERY NOTE','ESTADO':'STATUS','QR':'QR','#':'#','DESPACHADO':'SHIPPED','PENDIENTE':'PENDING','HOJA':'SHEET',
  'líneas':'lines','piezas':'pieces','No se encontró una lista de troquelados en ese Excel (hoja con columnas STAMP y MARK).':'No stamp list found in that Excel (sheet with STAMP and MARK columns).',
  'No se pudo abrir la cámara.':'Could not open the camera.','Escaneado':'Scanned','Total despachado':'Total shipped','Proyecto':'Project','Fecha':'Date',
- 'Lista':'List','Instalar app en este teléfono':'Install app on this phone','En iPhone/iPad: toca Compartir (cuadro con flecha) → «Agregar a inicio».':'On iPhone/iPad: tap Share (square with arrow) → “Add to Home Screen”.','DIBUJO':'DRAWING','Compartir o guardar Excel':'Share or save Excel','Abrir Excel':'Open Excel','Excel listo':'Excel ready','Si no aparece en Descargas, usa «Compartir o guardar Excel» para mandarlo por correo, Teams o WhatsApp, o guardarlo en Archivos o Drive.':'If it does not show up in Downloads, use “Share or save Excel” to send it by email, Teams or WhatsApp, or save it to Files or Drive.','Resumen':'Summary','Cuenta':'Count','línea':'line','de':'of'};
+ 'Lista':'List','Escanea este QR para ver la lista completa de la paleta.':'Scan this QR to see the full pallet list.','Ver lista de la paleta':'See pallet list','Compartir QR':'Share QR','Total paleta':'Pallet total','QR DE LA PALETA':'PALLET QR','Escanea para ver la lista':'Scan to see the list','Instalar app en este teléfono':'Install app on this phone','En iPhone/iPad: toca Compartir (cuadro con flecha) → «Agregar a inicio».':'On iPhone/iPad: tap Share (square with arrow) → “Add to Home Screen”.','DIBUJO':'DRAWING','Compartir o guardar Excel':'Share or save Excel','Abrir Excel':'Open Excel','Excel listo':'Excel ready','Si no aparece en Descargas, usa «Compartir o guardar Excel» para mandarlo por correo, Teams o WhatsApp, o guardarlo en Archivos o Drive.':'If it does not show up in Downloads, use “Share or save Excel” to send it by email, Teams or WhatsApp, or save it to Files or Drive.','Resumen':'Summary','Cuenta':'Count','línea':'line','de':'of'};
 let lang=(()=>{try{const q=new URLSearchParams(location.search).get('lang');if(q)return q==='en'?'en':'es';return localStorage.getItem('lang')==='en'?'en':'es'}catch(e){return 'es'}})();
 const t=s=>lang==='en'&&EN[s]!=null?EN[s]:s;
 function paintLang(){document.documentElement.lang=lang;document.querySelectorAll('[data-t]').forEach(e=>e.textContent=t(e.dataset.t));
@@ -273,16 +276,37 @@ async function camOpen(){ try{ stream=await navigator.mediaDevices.getUserMedia(
 function camClose(){ cancelAnimationFrame(raf); if(stream) stream.getTracks().forEach(x=>x.stop()); stream=null; $('cam').classList.remove('on'); }
 $('camBtn').onclick=camOpen; $('camClose').onclick=camClose;
 
+/* ---------- paletas: totales y QR con la lista ---------- */
+const PAL_URL='https://lndusa-visor.github.io/paleta/';
+const good=s=>s.li>=0&&(s.status==='ok'||s.status==='warn');
+function pallets(){ const m=new Map(); S.forEach((s,i)=>{ const k=s.truck||''; if(!m.has(k)) m.set(k,[]); m.get(k).push(i); });
+  return [...m.entries()].map(([k,idx])=>{ let n=0,w=0,a=0; idx.forEach(i=>{ const s=S[i]; if(good(s)){ const l=L.lines[s.li]; n++; w+=l.wt; a+=l.sa; } }); return {k,idx,n,w,a}; }); }
+const b64u=u8=>{ let b=''; for(let i=0;i<u8.length;i+=0x8000) b+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000)); return btoa(b).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); };
+async function palLink(P){
+  const H=L.headers, g=(l,k)=>{ const h=H.find(x=>kind(x)===k); return h?l.v[h]:''; }, cnt=new Map();
+  P.idx.forEach(i=>{ const s=S[i]; if(good(s)) cnt.set(s.li,(cnt.get(s.li)||0)+1); });
+  const marks=[...cnt.keys()].map(li=>String(g(L.lines[li],'mark')||'')); let px=marks.length?marks[0]:''; marks.forEach(m=>{ while(px&&!m.startsWith(px)) px=px.slice(0,-1); }); px=px.replace(/[^_-]*$/,'');
+  const rows=[...cnt.entries()].map(([li,q])=>{ const l=L.lines[li]; return [String(g(l,'stamp')||''),String(g(l,'mark')||'').slice(px.length),q,String(g(l,'desc')||''),String(g(l,'len')||''),Math.round(l.wt*q*10)/10,Math.round(l.sa*q*100)/100,String(g(l,'tipo2')||''),String(g(l,'coat')||'')]; });
+  const last=P.idx.length?S[P.idx[P.idx.length-1]].ts:Date.now();
+  const json=JSON.stringify({v:1,p:L.project||'',n:L.name||'',pl:P.k||'',d:new Date(last).toISOString().slice(0,16)+'Z',px,r:rows});
+  let enc='';
+  try{ if(typeof CompressionStream!=='undefined'){ const st=new Blob([json]).stream().pipeThrough(new CompressionStream('deflate-raw')); enc='z'+b64u(new Uint8Array(await new Response(st).arrayBuffer())); } }catch(e){ enc=''; }
+  if(!enc) enc='u'+b64u(new TextEncoder().encode(json));
+  return PAL_URL+'#'+enc; }
+const palCache=new Map();
+async function palQR(P,px){ const link=await palLink(P); return {link,png:qrPng(link,px)}; }
+
 /* ---------- pantalla ---------- */
 function vals(s){ if(s.li>=0) return L.lines[s.li].v; const q=parse(s.code), o={}; L.headers.forEach(h=>{ const k=kind(h); if(k==='mark') o[h]=q.mk; if(k==='stamp') o[h]=q.st; }); return o; }
 const fmt=(n,d=0)=>Number(n||0).toLocaleString(lang==='en'?'en-US':'es-US',{maximumFractionDigits:d,minimumFractionDigits:d});
 const qrCache=new Map();
-function qrPng(text,px){ const k=text+'|'+px; if(qrCache.has(k)) return qrCache.get(k); const q=qrMatrix(text), qz=2, n=q.size+2*qz, s=Math.max(1,Math.floor(px/n)); const c=document.createElement('canvas'); c.width=c.height=n*s;
+function qrMx(text){ const q=qrcode(0,'M'); q.addData(unescape(encodeURIComponent(text)),'Byte'); q.make(); const n=q.getModuleCount(); return {size:n,get:(r,c)=>q.isDark(r,c)}; }
+function qrPng(text,px){ const k=text+'|'+px; if(qrCache.has(k)) return qrCache.get(k); const q=qrMx(text), qz=2, n=q.size+2*qz, s=Math.max(1,Math.floor(px/n)); const c=document.createElement('canvas'); c.width=c.height=n*s;
   const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.fillStyle='#000'; for(let r=0;r<q.size;r++) for(let cc=0;cc<q.size;cc++) if(q.get(r,cc)) g.fillRect((cc+qz)*s,(r+qz)*s,s,s);
   const u=c.toDataURL('image/png'); qrCache.set(k,u); return u; }
 const stTxt=s=>s==='ok'?t('OK'):s==='warn'?t('Ya se despacharon todas'):s==='bad-proj'?t('Otro proyecto'):t('No está en la lista');
 const stCls=s=>s==='ok'?'st-ok':s==='warn'?'st-warn':'st-bad';
-function totals(){ let w=0,a=0; S.forEach(s=>{ if(s.li>=0&&s.status!=='bad-proj'){ const l=L.lines[s.li]; w+=l.wt/(l.qty||1); a+=l.sa/(l.qty||1); } });
+function totals(){ let w=0,a=0; S.forEach(s=>{ if(s.li>=0&&s.status!=='bad-proj'){ const l=L.lines[s.li]; w+=l.wt; a+=l.sa; } });
   const done=L?L.lines.filter((l,i)=>shipped(i)>=l.qty).length:0; return {w,a,done}; }
 function render(){
   if(!$('tb')) return;
@@ -297,7 +321,22 @@ function render(){
   const rows=[]; for(let i=S.length-1;i>=0&&rows.length<300;i--){ const s=S[i], l=s.li>=0?L.lines[s.li]:null;
     rows.push(`<tr><td>${i+1}</td>${L.headers.map(h=>`<td>${esc(vals(s)[h]??'')}</td>`).join('')}<td class="d">${(()=>{ const l=s.li>=0?L.lines[s.li]:null, im=l&&l.img&&IMG.get(l.img); return im?`<img alt="" src="data:image/${im.ext};base64,${im.b64}">`:''; })()}</td><td class="q"><img alt="" src="${qrPng(s.code,112)}"></td><td class="${stCls(s.status)}">${esc(stTxt(s.status))}</td><td>${esc(new Date(s.ts).toLocaleTimeString(lang==='en'?'en-US':'es-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}))}</td><td>${esc(s.truck||'')}</td><td><button class="x" type="button" data-del="${i}" aria-label="×">×</button></td></tr>`); }
   $('tb').innerHTML=rows.join('');
+  renderPals();
 }
+let palSeq=0;
+async function renderPals(){ const my=++palSeq, box=$('pals'); if(!L||!S.length){ box.innerHTML=''; return; }
+  const PS=pallets(); let n=0,w=0,a=0; PS.forEach(P=>{ n+=P.n; w+=P.w; a+=P.a; });
+  const parts=[];
+  for(const P of PS){ const q=await palQR(P,320); if(my!==palSeq) return;
+    parts.push(`<div class="card pal"><div class="palh">${esc(t('Paleta'))} ${esc(P.k||'—')}</div>
+      <div class="palt"><div><b>${fmt(P.n)}</b><span>${esc(t('piezas'))}</span></div><div><b>${fmt(P.w)}</b><span>lb</span></div><div><b>${fmt(P.a,1)}</b><span>ft²</span></div></div>
+      <div class="palq"><img alt="QR" src="${q.png}"><div><p class="mut" style="margin:0 0 8px">${esc(t('Escanea este QR para ver la lista completa de la paleta.'))}</p>
+      <a class="btn" href="${esc(q.link)}" target="_blank" rel="noopener">${esc(t('Ver lista de la paleta'))}</a> <button class="btn" type="button" data-share="${esc(P.k)}">${esc(t('Compartir QR'))}</button></div></div></div>`); }
+  parts.push(`<div class="card pal tot"><div class="palh">${esc(t('Total despachado'))}</div><div class="palt"><div><b>${fmt(n)}</b><span>${esc(t('piezas'))}</span></div><div><b>${fmt(w)}</b><span>lb</span></div><div><b>${fmt(a,1)}</b><span>ft²</span></div></div></div>`);
+  box.innerHTML=parts.join(''); }
+$('pals').onclick=async e=>{ const b=e.target.closest('[data-share]'); if(!b) return; const P=pallets().find(x=>x.k===b.dataset.share); if(!P) return;
+  const q=await palQR(P,640), blob=await (await fetch(q.png)).blob(), f=new File([blob],`${(L.project||'')}_${t('Paleta')}_${(P.k||'').replace(/[^\w.-]+/g,'_')}.png`,{type:'image/png'});
+  try{ if(navigator.canShare&&navigator.canShare({files:[f]})) await navigator.share({files:[f],title:f.name,text:q.link}); else { const a=document.createElement('a'); a.href=q.png; a.download=f.name; a.click(); } }catch(err){} };
 
 /* ---------- Excel ---------- */
 const xe=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'');
@@ -309,14 +348,14 @@ const STYLES=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet
 <fonts count="5"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="14"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF9C0006"/><name val="Arial"/></font></fonts>
 <fills count="6"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1D2326"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC6EFCE"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFEB9C"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFC7CE"/></patternFill></fill></fills>
 <borders count="2"><border/><border><left style="thin"><color rgb="FFB0B7BB"/></left><right style="thin"><color rgb="FFB0B7BB"/></right><top style="thin"><color rgb="FFB0B7BB"/></top><bottom style="thin"><color rgb="FFB0B7BB"/></bottom></border></borders>
-<cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="9"><xf/><xf fontId="1" applyFont="1"/>
+<cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="12"><xf/><xf fontId="1" applyFont="1"/>
 <xf fontId="2" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
-<xf borderId="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf borderId="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
 <xf fontId="3" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
 <xf fontId="3" fillId="4" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
 <xf fontId="4" fillId="5" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-<xf numFmtId="164" borderId="1" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
-<xf fontId="3" numFmtId="164" borderId="1" applyFont="1" applyNumberFormat="1" applyBorder="1"/></cellXfs></styleSheet>`;
+<xf numFmtId="164" borderId="1" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf fontId="3" numFmtId="164" borderId="1" applyFont="1" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf fontId="3" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="1"/></xf><xf fontId="3" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf fontId="3" numFmtId="3" borderId="1" applyFont="1" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs></styleSheet>`;
 function sheetXml(rows,{cols,heights,freeze,filter,drawing,merge}){
   let x=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>`;
   x+=`<sheetViews><sheetView workbookViewId="0">${freeze?`<pane ySplit="${freeze}" topLeftCell="A${freeze+1}" activePane="bottomLeft" state="frozen"/>`:''}</sheetView></sheetViews>`;
@@ -330,21 +369,27 @@ async function download(){
   if(!L) return; const z=new JSZip(), now=new Date(), H=L.headers, dstr=now.toLocaleDateString(lang==='en'?'en-US':'es-US');
   const fixed=['#'], hdr=[...fixed,...H,t('DIBUJO'),t('QR'),t('ESTADO'),t('FECHA'),t('HORA'),t('NO. PALETA')], dwCol=fixed.length+H.length, qrCol=dwCol+1;
   const numK=new Set(['qty','wt','sa','sno']);
-  const R=[[{v:[L.project,L.name].filter(Boolean).join(' · ')+' — '+t('DESPACHO').toUpperCase(),s:1}],[t('Fecha')+': '+dstr+(truck?'   ·   '+t('Paleta')+': '+truck:'')],[],hdr.map(h=>({v:h,s:2}))];
+  const R=[[{v:[L.project,L.name].filter(Boolean).join(' · ')+' — '+t('DESPACHO').toUpperCase(),s:1}],[t('Fecha')+': '+dstr],[],hdr.map(h=>({v:h,s:2}))];
   const hts={3:30}, pics=[], media=new Map();
-  S.forEach((s,i)=>{ const l=s.li>=0?L.lines[s.li]:null, d=new Date(s.ts);
-    const row=[{v:i+1,s:3}];
-    const VV=vals(s); H.forEach(h=>{ const v=VV[h]??''; row.push({v:v===''||v==null?'':v,s:typeof v==='number'&&(kind(h)==='wt'||kind(h)==='sa')?7:3}); });
-    row.push({v:'',s:3}); row.push({v:'',s:3}); row.push({v:stTxt(s.status),s:s.status==='ok'?4:s.status==='warn'?5:6});
-    row.push({v:d.toLocaleDateString(lang==='en'?'en-US':'es-US'),s:3}); row.push({v:d.toLocaleTimeString(lang==='en'?'en-US':'es-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),s:3}); row.push({v:s.truck||'',s:3});
-    R.push(row); const ri=R.length-1; hts[ri]=62;
-    if(!media.has(s.code)) media.set(s.code,{f:'qr'+(media.size+1)+'.png',qr:s.code}); pics.push({r:ri,c:qrCol,img:media.get(s.code).f,cx:74*9525,cy:74*9525});
-    const im=l&&l.img&&IMG.get(l.img); if(im){ const k='d:'+l.img; if(!media.has(k)) media.set(k,{f:'dw'+(media.size+1)+'.'+(im.ext==='jpeg'?'jpeg':'png'),im}); const sc=Math.min(1,(180*9525)/im.cx,(74*9525)/im.cy); pics.push({r:ri,c:dwCol,img:media.get(k).f,cx:Math.round(im.cx*sc),cy:Math.round(im.cy*sc)}); } });
-  // fila de totales
-  let tw=0,ta=0; S.forEach(s=>{ if(s.li>=0&&s.status!=='bad-proj'){ const l=L.lines[s.li]; tw+=l.wt/(l.qty||1); ta+=l.sa/(l.qty||1); } });
-  const tot=new Array(hdr.length).fill(null); tot[0]={v:t('Total despachado'),s:8}; const iw=H.findIndex(h=>kind(h)==='wt'), ia=H.findIndex(h=>kind(h)==='sa');
-  if(iw>=0) tot[fixed.length+iw]={v:Math.round(tw*100)/100,s:8}; if(ia>=0) tot[fixed.length+ia]={v:Math.round(ta*100)/100,s:8};
-  const iq=H.findIndex(h=>kind(h)==='qty'); tot[fixed.length+(iq>=0?iq:0)]= {v:S.filter(s=>s.status==='ok'||s.status==='warn').length,s:8}; R.push([]); R.push(tot);
+  const iw=H.findIndex(h=>kind(h)==='wt'), ia=H.findIndex(h=>kind(h)==='sa'), iq=H.findIndex(h=>kind(h)==='qty');
+  const totRow=(label,n,w,a)=>{ const tr=new Array(hdr.length).fill(null); for(let c=0;c<hdr.length;c++) tr[c]={v:'',s:8}; tr[0]={v:label,s:10};
+    tr[fixed.length+(iq>=0?iq:0)]={v:n,s:11}; if(iw>=0) tr[fixed.length+iw]={v:Math.round(w*100)/100,s:8}; if(ia>=0) tr[fixed.length+ia]={v:Math.round(a*100)/100,s:8}; return tr; };
+  const PS=pallets(); let gn=0,gw=0,ga=0; const merges=[], qc=fixed.length+(iq>=0?iq:0), mergeTot=()=>{ if(qc>1) merges.push(`A${R.length}:${colL(qc-1)}${R.length}`); };
+  for(const P of PS){
+    P.idx.forEach(i=>{ const s=S[i], l=s.li>=0?L.lines[s.li]:null, d=new Date(s.ts);
+      const row=[{v:i+1,s:3}];
+      const VV=vals(s); H.forEach(h=>{ const v=VV[h]??''; row.push({v:v===''||v==null?'':v,s:typeof v==='number'&&(kind(h)==='wt'||kind(h)==='sa')?7:3}); });
+      row.push({v:'',s:3}); row.push({v:'',s:3}); row.push({v:stTxt(s.status),s:s.status==='ok'?4:s.status==='warn'?5:6});
+      row.push({v:d.toLocaleDateString(lang==='en'?'en-US':'es-US'),s:3}); row.push({v:d.toLocaleTimeString(lang==='en'?'en-US':'es-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),s:3}); row.push({v:s.truck||'',s:3});
+      R.push(row); const ri=R.length-1; hts[ri]=62;
+      if(!media.has(s.code)) media.set(s.code,{f:'qr'+(media.size+1)+'.png',qr:s.code}); pics.push({r:ri,c:qrCol,img:media.get(s.code).f,cx:74*9525,cy:74*9525});
+      const im=l&&l.img&&IMG.get(l.img); if(im){ const k='d:'+l.img; if(!media.has(k)) media.set(k,{f:'dw'+(media.size+1)+'.'+(im.ext==='jpeg'?'jpeg':'png'),im}); const sc=Math.min(1,(180*9525)/im.cx,(74*9525)/im.cy); pics.push({r:ri,c:dwCol,img:media.get(k).f,cx:Math.round(im.cx*sc),cy:Math.round(im.cy*sc)}); } });
+    // total de la paleta + QR con la lista
+    const tr=totRow(t('Total paleta')+' '+(P.k||'—'),P.n,P.w,P.a); tr[qrCol+1]={v:'← '+t('QR DE LA PALETA')+': '+t('Escanea para ver la lista'),s:10};
+    R.push(tr); mergeTot(); const ri=R.length-1; hts[ri]=140;
+    const link=await palLink(P); const k='p:'+P.k; media.set(k,{f:'pal'+(media.size+1)+'.png',qr:link,big:true}); pics.push({r:ri,c:dwCol,img:media.get(k).f,cx:170*9525,cy:170*9525});
+    R.push([]); gn+=P.n; gw+=P.w; ga+=P.a; }
+  R.push(totRow(t('Total despachado'),gn,gw,ga)); mergeTot(); hts[R.length-1]=24;
   const wid=h=>{ const k=kind(h); return k==='desc'?20:k==='mark'?18:k==='len'?13:k==='tipo2'?13:k==='tipo'?14:k==='coat'?12:k==='wt'||k==='sa'?12:9; };
   const cols=[5,...H.map(wid),27,11,18,11,12,14];
   // resumen por línea
@@ -357,16 +402,16 @@ async function download(){
   z.file('xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
   z.file('xl/styles.xml',STYLES);
   const last=colL(hdr.length-1);
-  z.file('xl/worksheets/sheet1.xml',sheetXml(R,{cols,heights:hts,freeze:4,filter:S.length?`A4:${last}${3+S.length+1}`:null,drawing:pics.length>0}));
+  z.file('xl/worksheets/sheet1.xml',sheetXml(R,{cols,heights:hts,freeze:4,filter:null,merge:merges,drawing:pics.length>0}));
   z.file('xl/worksheets/sheet2.xml',sheetXml(RS,{cols:[16,...H.map(wid),12,12],heights:{2:30},freeze:3,filter:`A3:${colL(H.length+2)}${RS.length}`}));
   if(pics.length){
     z.file('xl/worksheets/_rels/sheet1.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>');
     const ids=new Map(); let rel='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
     media.forEach(m=>{ const f=m.f, id='rId'+(ids.size+1); ids.set(f,id); rel+=`<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/${f}"/>`;
-      z.file('xl/media/'+f,m.qr!=null?qrPng(m.qr,240).split(',')[1]:m.im.b64,{base64:true}); });
+      z.file('xl/media/'+f,m.qr!=null?qrPng(m.qr,m.big?720:240).split(',')[1]:m.im.b64,{base64:true}); });
     z.file('xl/drawings/_rels/drawing1.xml.rels',rel+'</Relationships>');
     const E=9525, sz=74*E; let dr='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
-    pics.forEach((p,i)=>{ dr+=`<xdr:oneCellAnchor><xdr:from><xdr:col>${p.c}</xdr:col><xdr:colOff>${4*E}</xdr:colOff><xdr:row>${p.r}</xdr:row><xdr:rowOff>${3*E}</xdr:rowOff></xdr:from><xdr:ext cx="${p.cx}" cy="${p.cy}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${i+2}" name="Pic ${i+1}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${ids.get(p.img)}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${p.cx}" cy="${p.cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`; });
+    pics.forEach((p,i)=>{ const cw=Math.round(((cols[p.c]||10)*7+5)*E), off=Math.max(2*E,Math.round((cw-p.cx)/2)); dr+=`<xdr:oneCellAnchor><xdr:from><xdr:col>${p.c}</xdr:col><xdr:colOff>${off}</xdr:colOff><xdr:row>${p.r}</xdr:row><xdr:rowOff>${Math.max(2*E,Math.round(((hts[p.r]||15)*4/3*E-p.cy)/2))}</xdr:rowOff></xdr:from><xdr:ext cx="${p.cx}" cy="${p.cy}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${i+2}" name="Pic ${i+1}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${ids.get(p.img)}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${p.cx}" cy="${p.cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`; });
     z.file('xl/drawings/drawing1.xml',dr+'</xdr:wsDr>'); }
   const blob=await z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',compression:'DEFLATE'});
   const pad=n=>String(n).padStart(2,'0'), fn=`${(L.project||'Proyecto').replace(/[^\w.-]+/g,'_')}_${t('DESPACHO').toUpperCase()}_${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.xlsx`;
