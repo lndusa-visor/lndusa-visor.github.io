@@ -104,7 +104,7 @@ details.sec>div{padding-top:10px;display:flex;flex-direction:column;gap:10px}
   <header>
     <div>
       <h1>Nuevo proyecto · BOM, IFC y pernos</h1>
-      <span class="hint" id="appVer">Versión 12</span>
+      <span class="hint" id="appVer">Versión 13</span>
       <p class="sub">Carga el BOM tal como sale de Tekla y descarga cuatro Excel: <b>BOM trabajado</b> (BOM, compra, placas y pernos), <b>PR para SAP</b>, <b>Lista de troquelados</b> (piezas principales con su troquel y su QR al visor 3D) y <b>Plan de corte</b> (del Optimizador de cortes, al final de la página). Con varias unidades, la compra y el corte van juntos y los troquelados por unidad.</p>
     </div>
     <span class="tag" id="srcTag">Ejemplo: BOM US068.1</span>
@@ -4386,7 +4386,8 @@ load(RAW_SAMPLE,'BESS Area PDC and Transformer','Ejemplo: BESS Assembly List BOM
       if(G.over.length||G.overPlates.length||G.miss.length) over.push(`${u||'proyecto'}: ${G.over.length+G.overPlates.length} piezas no caben en barra o lámina${G.miss.length?` · ${G.miss.length} materiales sin fila`:''}`);
       await addToAvance(new File([G.blob],G.name),info); n++; }
     info('Agregando el proyecto al tablero…'); const T=await AV.publishTablero({code:($i('code').value||'').trim(),name:($i('pname').value||'').trim(),token,ifcNames:(window.__ifcFiles||[]).map(f=>f.name),onProgress:info}), w=[...over,...T.warn];
-    info(`Listo: ${n} Excel de avance descargado${n>1?'s':''}, visor con QR vivos y proyecto agregado al tablero (GitHub tarda 1–2 minutos en mostrarlo).${w.length?' Revisa: '+w.join(' · '):''}`);
+    let own=''; try{ const c=($i('code').value||'').trim(), r=await fetch('tablero-virgen.html?v='+Date.now(),{cache:'no-store'}); if(!r.ok) throw new Error(r.status); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([await r.text()],{type:'text/html'})); a.download=`${c} Tablero.html`; document.body.append(a); a.click(); a.remove(); own=` y el HTML «${c} Tablero.html» para la carpeta del proyecto`; }catch(e){ console.warn('HTML del proyecto',e); own=' (no pude descargar el HTML del proyecto: pide otra copia)'; }
+    info(`Listo: ${n} Excel de avance descargado${n>1?'s':''}${own}, visor con QR vivos y tablero publicado (GitHub tarda 1–2 minutos en mostrarlo).${w.length?' Revisa: '+w.join(' · '):''}`);
   }catch(e){ console.error(e); info((e&&e.status===401?'El token no sirve o venció. ':'')+'No se pudo terminar: '+(e&&e.message||e)); } finally{ btn.disabled=false; } });
 })();
 </script>
