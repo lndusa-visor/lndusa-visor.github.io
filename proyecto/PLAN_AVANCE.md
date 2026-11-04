@@ -5,8 +5,8 @@ idéntico en estructura y fórmulas al de los Piperacks 30 m / 55 m (archivos de
 más lo nuevo: Stamp BOM con letra, LISTA DE TROQUELADOS, PR SAP y PLAN DE CORTE.
 Después: el tablero (Weld Map) arma su 3D (SCENES) desde el IFC.
 
-Referencias (sesión actual): /tmp/claude-0/wm/b30.xlsx, b55.xlsx (Excel del compañero),
-/tmp/claude-0/np/*.xls (BOM), *Bolt_Summary*.xlsx, /tmp/claude-0/ifc/u2/*.ifc, /tmp/claude-0/wm/wm.html (tablero).
+Referencias: se adjuntan en cada sesión (no están en GitHub, y no deben subirse: GitHub Pages es público).
+Referencia completa: BOM_Connection_Type_WTS_PDC_Piperacks_55m_EN_con_troquel.xlsx (19 hojas).
 
 ## Hecho
 - proyecto/index.html: lista de troquelados (1 hoja, QR por pieza), PR SAP única, publicar visor, «Agregar al Excel de avance».
@@ -35,7 +35,15 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
   · gusset p10 (30 m) / p7 (55 m) sobre ángulo: 32.8 vs 24.8 in (la referencia no cuenta los extremos de 4");
   · nota 181 del 30 m: la referencia nombra el Point-to-Point viejo (BOM-0111); el generador nombra el Bolt Summary cargado.
 
+## TAKEOFF BASE, MTO SUMMARY, PROFILE CUTTING PLAN, PLATE NESTING (proyecto/avance-mto.js)
+- AV.mtoParts lee las filas P/H de la hoja BOM; AV.mtoSheets arma las 4 hojas. Estilos fijos en el código (mismos índices de styles.xml).
+- Comparación contra el Excel de 55 m: 0 diferencias en valor, fórmula, resultado guardado, estilo y alto de fila (3216 celdas). Recalculado en LibreOffice: 0 diferencias, 0 errores.
+- Probado leyendo la BOM del Excel de 55 m. Falta probar: con la BOM generada (AV.bomSheet) y con el de 30 m.
+- Corte: first-fit por largo descendente (empates en orden del BOM); kerf por corte, recorte al final; barras iguales juntas, primero las más repetidas. Usado = redondeo a 3 decimales con empate al par; largos con 6 cifras significativas.
+- Placas: área descendente, Best Short Side Fit, primera lámina donde quepa, lámina útil = lámina − bordes + separación, sin reordenar láminas. Ojo: difiere del nest() de index.html (mismo número de láminas en 55 m, otro acomodo).
+- Entran como opciones, no se deducen: largo de barra por perfil (stock) y tamaño de lámina (los elige el HTML); pernos, tuercas, arandelas y anclajes (del Bolt Summary, falta conectarlo); columna de repuesto (VENDOR REQUISITION C7).
+
 ## Siguiente
 1. Generador JS (Node + navegador) hoja por hoja, comparando celda por celda contra b30/b55.
-2. Orden: BOM CONNECTION → TAKEOFF/MTO/CUTTING PLAN/NESTING → VENDOR REQ/PO → CUTTING TRACKING → WELDING → PAINTING → 3D CONTROL → DAILY/WEEKLY.
+2. Orden: BOM CONNECTION (hecha) → TAKEOFF/MTO/CUTTING PLAN/NESTING (hechas) → VENDOR REQ/PO → CUTTING TRACKING → WELDING → PAINTING → 3D CONTROL → DAILY/WEEKLY.
 3. Tablero: SCENES (partes, soldaduras, pernos, ptp, grid, info) desde el IFC.
