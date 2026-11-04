@@ -43,7 +43,11 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 - Placas: área descendente, Best Short Side Fit, primera lámina donde quepa, lámina útil = lámina − bordes + separación, sin reordenar láminas. Ojo: difiere del nest() de index.html (mismo número de láminas en 55 m, otro acomodo).
 - Entran como opciones, no se deducen: largo de barra por perfil (stock) y tamaño de lámina (los elige el HTML); pernos, tuercas, arandelas y anclajes (del Bolt Summary, falta conectarlo); columna de repuesto (VENDOR REQUISITION C7).
 
+## VENDOR REQUISITION y PURCHASE ORDERS (AV.vendorSheets en avance-mto.js)
+- Mismo diseño y fórmulas; solo cambian los datos del proyecto. PURCHASE ORDERS sale sin órdenes. Comparadas contra 55 m.
+- AV.vendorSheets devuelve mats (clave de material → fila), que necesitará 3D CONTROL. Falta probar con la BOM generada y con 30 m.
+
 ## Siguiente
 1. Generador JS (Node + navegador) hoja por hoja, comparando celda por celda contra b30/b55.
-2. Orden: BOM CONNECTION (hecha) → TAKEOFF/MTO/CUTTING PLAN/NESTING (hechas) → VENDOR REQ/PO → CUTTING TRACKING → WELDING → PAINTING → 3D CONTROL → DAILY/WEEKLY.
+2. Orden: BOM CONNECTION (hecha) → TAKEOFF/MTO/CUTTING PLAN/NESTING (hechas) → VENDOR REQ/PO (hechas) → CUTTING TRACKING → WELDING → PAINTING → 3D CONTROL → DAILY/WEEKLY.
 3. Tablero: SCENES (partes, soldaduras, pernos, ptp, grid, info) desde el IFC.

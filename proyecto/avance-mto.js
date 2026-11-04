@@ -136,6 +136,61 @@
     mt.push(noteRow(r,85,`Bolting per Bolt Summary ${boltDoc} ${rev} (0% added).`+(o.anchors?` ${o.anchors.desc} adhesive anchors (${o.anchors.n}) are listed in VENDOR REQUISITION for scope confirmation.`:'')));
 
     return {takeoff:{rows:tk,lastCol:'M',filter:`$A$4:$M$${last}`,subst:[[/<autoFilter ref="[^"]*">/,`<autoFilter ref="A4:M${last}">`]]},
-      mto:{rows:mt,lastCol:'M'},plan:{rows:pl,lastCol:'J'},nesting:{rows:ns,lastCol:'J'},over,overPlates:overP,last,tot,profs,plates}; };
+      mto:{rows:mt,lastCol:'M'},plan:{rows:pl,lastCol:'J'},nesting:{rows:ns,lastCol:'J'},over,overPlates:overP,last,tot,profs,plates,takeoffParts:P}; };
+
+  /* ---- VENDOR REQUISITION y PURCHASE ORDERS: mismo diseño y fórmulas; cambian los datos del proyecto.
+     PURCHASE ORDERS sale sin órdenes: se llena a mano. Los campos manuales de la requisición quedan vacíos. ---- */
+  const LONGNAME=d=>{ const u=String(d).toUpperCase(); return /^W\d/.test(u)?'Wide flange beam':/^HSS/.test(u)?'Hollow structural section':/^(C|MC)\d/.test(u)?'Channel':/^L\d/.test(u)?'Equal-leg angle':/^PIPE/.test(u)?'Pipe':'Profile'; };
+  AV.vendorSheets=function(o,R){ const VR='VENDOR REQUISITION', PO='PURCHASE ORDERS', rev=o.rev||'Rev 0', last=R.last, tb=c=>`'TAKEOFF BASE'!$${c}$5:$${c}$${last}`, po=c=>`'${PO}'!$${c}$8:$${c}$207`;
+    const nf=x=>Number(x).toLocaleString('en-US'), pct=x=>Math.round(x*100), rows=[], merges=[], mats={}, sheet=o.sheet||[4,8], sw=Math.min(...sheet), sl=Math.max(...sheet), sTxt=`${sw}' x ${sl}'`, sA=sw*sl, spares=o.spares??0.05;
+    rows.push(noteRow(1,77,'MATERIAL REQUISITION TO VENDOR','18',true),noteRow(2,61,`${o.proj} – LINDSAYCA, Inc. – Ref. BOM ${o.bomDocFull||o.bomDoc} (${rev}) / Bolt Summary ${o.boltDocFull||o.boltDoc} (${rev})`));
+    const H4=(r,a,g,sI)=>({r,ht:'15',ch:false,cells:cells(`A70 B70 C102 D102 E102 G70 H70 I${sI} J${sI} K${sI}`,{A:txt(a),G:txt(g)})});
+    rows.push(H4(4,'Requisition No.','Date',103),H4(5,'Requested by','Vendor',102),H4(6,'Delivery location','Required on-site date',103));
+    rows.push({r:7,ht:'15',ch:false,cells:cells('A70 B70 C104 D59 N59',{A:txt('% bolt spares'),C:num(spares),D:txt('Bolt Summary states 0% added; adjust to purchasing policy.'),N:txt('Columns N–U: purchasing. SAP CODE and PR No. are typed here; vendors and POs are typed in PURCHASE ORDERS (one row per PO line, several vendors per item allowed).')})});
+    const VH=['ITEM','CATEGORY','DESCRIPTION','MATERIAL / SPEC','UNIT','NET QTY.','STOCK SIZE','No. BARS / SHEETS','QTY. TO BUY','APPROX. WEIGHT (lb)','REMARKS','DATE RECEIVED IN SHOP','MATERIAL KEY (3D control)','SAP CODE','PR No.','VENDOR (first PO)','No. OF POs','QTY. ORDERED','PENDING TO ORDER','QTY. RECEIVED','PURCHASE STATUS'], VL='ABCDEFGHIJKLMNOPQRSTU'.split('');
+    rows.push({r:9,ht:'31.5',ch:true,cells:VL.map((c,i)=>({c,s:5,v:VH[i]}))});
+    ['A4:B4','C4:E4','G4:H4','I4:K4','A5:B5','C5:E5','G5:H5','I5:K5','A6:B6','C6:E6','G6:H6','I6:K6','A7:B7'].forEach(m=>merges.push(m));
+    let r=10, item=0; const SEC='A105 B105 C105 D105 E105 F105 G105 H105 I105 J105 K105 L105 M105', SUB='A69 B69 C99 D69 E99 F51 G69 H69 I51 J114 K69 L69 M69';
+    const sec=t=>{ rows.push({r,ht:'15',ch:false,cells:cells(SEC,{A:txt(t)})}); merges.push(`A${r}:M${r}`); r++; };
+    // columnas de compra, iguales en todos los ítems
+    const buyCols=(x,q)=>({P:fx(`IFERROR(INDEX(${po('G')},MATCH(A${x},${po('A')},0)),"")`,''),Q:fx(`COUNTIF(${po('A')},A${x})`,0),R:fx(`SUMIFS(${po('K')},${po('A')},A${x})`,0),S:fx(`MAX(0,I${x}-R${x})`,q),T:fx(`SUMIFS(${po('M')},${po('A')},A${x})`,0),
+      U:fx(`IF(I${x}=0,"NOT REQUIRED",IF(AND(T${x}>=I${x},T${x}>0),"RECEIVED",IF(T${x}>0,"PARTIALLY RECEIVED",IF(R${x}>=I${x},"ORDERED",IF(R${x}>0,"PARTIALLY ORDERED",IF(O${x}<>"","PR ISSUED","TO REQUEST"))))))`,q===0?'NOT REQUIRED':'TO REQUEST')});
+    const subRow=(lab,unit,f,l,net,buy,wt,all)=>{ const x=r; rows.push({r,ht:'15',ch:false,cells:cells(all?'A69 B69 C99 D69 E99 F114 G69 H69 I114 J69 K69 L69 M69':SUB,Object.assign({C:txt(lab),E:txt(unit),F:fx(`SUM(F${f}:F${l})`,net),I:fx(`SUM(I${f}:I${l})`,buy)},all?{}:{J:fx(`SUM(J${f}:J${l})`,wt)}))}); r+=2; return x; };
+    const MATS='A29 B10 C10 D10 E10 F106 G107 H108 I109 J110 K111 L37 M112 N34 O21 P113 Q64 R75 S75 T75 U33', tots=[]; let letter=0; const nextL=()=>String.fromCharCode(65+letter++);
+    const profGroup=(list,title,lab)=>{ if(!list.length) return; sec(`${nextL()}. ${title} (linear feet)`); const f=r; let n=0,b=0,w=0;
+      list.forEach(g=>{ const net=sumV(g.rows,'tl'), buy=g.bars*g.S, wt=buy*g.lf; item++; n+=net;b+=buy;w+=wt; mats[`${g.desc}|${g.grade}`]=r;
+        rows.push({r,ht:'15',ch:false,cells:cells(MATS,Object.assign({A:num(item),B:txt(g.cat),C:txt(`${LONGNAME(g.desc)} ${g.desc}`),D:txt(g.grade),E:txt('ft'),F:fx(`SUMIFS(${tb('J')},${tb('D')},"${g.desc}",${tb('F')},D${r})`,net),G:num(g.S),H:fx(`'PROFILE CUTTING PLAN'!C${g.subRow}`,g.bars),I:fx(`G${r}*H${r}`,buy),J:fx(`I${r}*${g.lf}`,wt),K:txt(`${g.bars} bars of ${g.S} ft · yield ${pct(net/buy)}%`),M:txt(`${g.desc}|${g.grade}`)},buyCols(r,buy)))}); r++; });
+      tots.push({x:subRow(lab,'ft',f,r-1,n,b,w),w}); };
+    const W=R.profs.filter(g=>g.cat==='PROFILE'), allW=W.every(g=>/^W\d/i.test(g.desc));
+    profGroup(W,allW?'STRUCTURAL PROFILES – W':'STRUCTURAL PROFILES','Subtotal profiles'); profGroup(R.profs.filter(g=>g.cat==='ANGLE'),'ANGLES','Subtotal angles');
+    if(R.plates.length){ sec(`${nextL()}. PLATES (square feet) – ${sTxt} sheet = ${sA} ft²`); const f=r; let n=0,b=0,w=0;
+      R.plates.forEach(g=>{ const net=sumV(g.rows,'ta'), buy=g.sheets*sA, wt=buy*40.84*g.t, pcs=sumV(g.rows,'qty'), key=`PL${Number.isInteger(g.t)?g.t.toFixed(1):g.t}|${g.grade}`; item++; n+=net;b+=buy;w+=wt; mats[key]=r;
+        rows.push({r,ht:'15',ch:false,cells:cells(MATS.replace('G107','G115'),Object.assign({A:num(item),B:txt('PLATE'),C:txt(`Plate t=${g.tok.replace(/^PL/,'')}`),D:txt(g.grade),E:txt('ft²'),F:fx(`SUMIFS(${tb('K')},${tb('I')},${g.t},${tb('F')},D${r})`,net),G:txt(sTxt),H:fx(`'PLATE NESTING'!C${g.subRow}`,g.sheets),I:fx(`H${r}*${sA}`,buy),J:fx(`I${r}*40.84*${g.t}`,wt),K:txt(`${pcs} pieces · yield ${pct(net/buy)}%`),M:txt(key)},buyCols(r,buy)))}); r++; });
+      tots.push({x:subRow('Subtotal plates','ft²',f,r-1,n,b,w),w}); }
+    sec(`${nextL()}. GRATING (square feet)`); { const f=r; item++; rows.push({r,ht:'25.5',ch:true,cells:cells('A29 B10 C10 D10 E10 F116 G10 H10 I10 J10 K111 L117 M10 N34 O21 P113 Q64 R75 S75 T75 U33',Object.assign({A:num(item),B:txt('GRATING'),C:txt('Welded steel grating (type TBD)'),E:txt('ft²'),F:num(0),I:fx(`F${r}`,0),J:num(0),K:txt(`No grating in BOM ${rev}. Complete if the drawing is issued.`)},buyCols(r,0)))}); r++; tots.push({x:subRow('Subtotal grating','ft²',f,r-1,0,0,0),w:0}); }
+    const bolts=o.bolts||[], dia=o.boltDia||'3/4"', totB=sumV(bolts,'field')+sumV(bolts,'shop'), bspec=(bolts[0]&&bolts[0].grade)||'A325N';
+    sec(`${nextL()}. BOLTS (units) – ${bspec}, each bolt with 1 heavy hex nut and 1 hardened washer (Bolt Summary ${o.boltDoc}, field + shop)`);
+    { const f=r, BR='A29 B10 C10 D10 E10 F118 G10 H10 I119 J10 K10 L37 M10 N34 O21 P113 Q64 R75 S75 T75 U33', up=x=>Math.ceil(x*(1+spares)-1e-9); let net=0,buy=0; const bf=r;
+      bolts.forEach(x=>{ const t=x.field+x.shop, q=up(t); item++; net+=t; buy+=q; rows.push({r,ht:'15',ch:false,cells:cells(BR,Object.assign({A:num(item),B:txt('BOLT'),C:txt(`Heavy hex structural bolt ${String(x.desc).replace(/\s*heavy hex$/i,'')}`),D:txt(x.grade),E:txt('ea'),F:num(t),I:fx(`ROUNDUP(F${r}*(1+$C$7),0)`,q),K:txt(`Field ${nf(x.field)} + Shop ${nf(x.shop)} (Bolt Summary)`)},buyCols(r,q)))}); r++; });
+      const bl=r-1, link=Array.from({length:bl-bf+1},(_,i)=>`F${bf+i}`).join('+');
+      [['NUT',`Heavy hex nut Ø${dia}`,o.nutSpec||'A563 DH',o.nuts??totB],['WASHER',`Hardened washer Ø${dia}`,o.washerSpec||'F436',o.washers??totB]].forEach(([c,d,sp,sum])=>{ const q=up(totB); item++; net+=totB; buy+=q; rows.push({r,ht:'15',ch:false,cells:cells(BR.replace('F118','F110'),Object.assign({A:num(item),B:txt(c),C:txt(d),D:txt(sp),E:txt('ea'),F:fx(link,totB),I:fx(`ROUNDUP(F${r}*(1+$C$7),0)`,q),K:txt(`1 per bolt (Bolt Summary: ${nf(sum)})`)},buyCols(r,q)))}); r++; });
+      if(o.anchors){ const a=o.anchors, n=a.n; item++; net+=n; buy+=n; const model=a.model!=null?` · 3D model: ${a.model}${a.basePlates?` (${a.basePlates} base plates × ${a.perPlate})`:''}`:'';
+        rows.push({r,ht:'38.25',ch:true,cells:cells(BR.replace('K10','K111'),Object.assign({A:num(item),B:txt('ANCHOR'),C:txt(`Adhesive anchor ${a.desc}`),D:txt(a.spec||'HILTI HIT (rod + adhesive TBD)'),E:txt('ea'),F:num(n),I:fx(`F${r}`,n),K:txt(`Bolt Summary ${o.boltDoc}: ${n}${model}. Confirm adhesive, rod grade and supply scope (civil / site).`)},buyCols(r,n)))}); r++; }
+      subRow('Subtotal bolting (bolts + nuts + washers + anchors)','ea',f,r-1,net,buy,0,true); }
+    const buyW=tots.reduce((t,x)=>t+x.w,0), netW=sumV(R.takeoffParts,'tw'), kg=Math.round(buyW*0.45359237).toLocaleString('en-US');
+    rows.push({r,ht:'15',ch:false,cells:cells('C99 J114 K99',{C:txt('TOTAL STEEL WEIGHT TO BUY (lb)'),J:fx(tots.map(t=>`J${t.x}`).join('+'),buyW),K:fx(`TEXT(J${r}*0.45359237,"#,##0")&" kg"`,`${kg} kg`)})}); const rb=r; r++;
+    rows.push({r,ht:'15',ch:false,cells:cells('C99 J114 K69',{C:txt('Check: BOM net weight (lb)'),J:fx(`'TAKEOFF BASE'!M${R.tot}`,netW),K:fx(`TEXT(J${rb}/J${r}-1,"0.0%")&" purchase allowance over net"`,`${((buyW/netW-1)*100).toFixed(1)}% purchase allowance over net`)})}); const end=r; r+=2;
+    rows.push(noteRow(r,120,'Notes:')); r++;
+    [`1. Net quantities calculated from the TAKEOFF BASE sheet (${o.bomDoc} ${rev}). Quantity to buy = bars/sheets from the PROFILE CUTTING PLAN and PLATE NESTING sheets x stock size.`,'2. Profiles in linear feet (ft); plates in square feet (ft²); bolting in units (ea).','3. Yellow cells: data to fill in or editable parameters. Blue: input data; green: link to another sheet.','4. Mill test reports (MTR) required for all steel. Coating not stated in the BOM (COATING column empty). Bolting finish per drawing (confirm galvanized).','5. DATE RECEIVED IN SHOP: when each material arrives, enter the date. The 3D CONTROL sheet uses it to move pieces from "NOT YET ARRIVED" to "MATERIAL IN SHOP".'].forEach(t=>{ rows.push(noteRow(r,121,t)); r++; });
+
+    /* PURCHASE ORDERS */
+    const vr=c=>`'${VR}'!$${c}$10:$${c}$${end}`, m=x=>`MATCH($A${x},${vr('A')},0)`, pr=[noteRow(1,60,'PURCHASE ORDERS – VENDOR / PR / PO REGISTER','18',true),noteRow(2,61,'One row per purchase order line. Type the VENDOR REQUISITION ITEM: description, unit and SAP code are filled in. Several rows for the same item = several vendors / POs. Shown in the Weld Map dashboard (button Material).')];
+    pr.push({r:4,ht:'15',ch:false,cells:cells('A70 B122 C72 D122 E72 F122 G123 I124',{A:txt('Totals'),B:txt('PO lines'),C:fx('COUNTA(I8:I207)',0),D:txt('Vendors'),E:fx('SUMPRODUCT((G8:G207<>"")/COUNTIF(G8:G207,G8:G207&""))',0),F:txt('Approx. lb ordered'),G:fx('SUM(Q8:Q207)',0),I:txt('Example (not real data): ITEM 4 · VENDOR Steel Supplier A · PR 1000123 · PO 4500012345 · 10/20/2026 · 360 ft; second row ITEM 4 · VENDOR Steel Supplier B · PO 4500012399 · 360 ft → 2 vendors for item 4.')})});
+    const PH=['ITEM (VENDOR REQ.)','CATEGORY','DESCRIPTION','MATERIAL / SPEC','UNIT','SAP CODE','VENDOR','PR No.','PO No.','PO DATE','QTY. ORDERED','PROMISED DATE','QTY. RECEIVED','DATE RECEIVED','REMARKS','QTY. TO BUY (item)','APPROX. lb ORDERED'];
+    pr.push({r:7,ht:'33.75',ch:true,cells:'ABCDEFGHIJKLMNOPQ'.split('').map((c,i)=>({c,s:5,v:PH[i]}))});
+    for(let x=8;x<=207;x++){ const look=c=>fx(`IF($A${x}="","",IFERROR(INDEX(${vr(c)},${m(x)})&"",""))`,'');
+      pr.push({r:x,ht:'15',ch:false,cells:cells('A34 B113 C113 D113 E125 F125 G21 H125 I21 J37 K126 L37 M126 N37 O127 P100 Q75',{B:look('B'),C:look('C'),D:look('D'),E:look('E'),F:look('N'),H:look('O'),P:fx(`IF($A${x}="","",IFERROR(INDEX(${vr('I')},${m(x)}),""))`,''),Q:fx(`IF(OR($A${x}="",K${x}=""),"",IFERROR(K${x}/INDEX(${vr('I')},${m(x)})*INDEX(${vr('J')},${m(x)}),""))`,'')})}); }
+    const itemRows=rows.filter(R=>R.cells.some(c=>c.c==='U')&&R.r>9).map(R=>R.r), dv=AV.ranges('L',itemRows).join(' ');
+    return {vendor:{rows,lastCol:'U',merges,subst:[[/(<dataValidation [^>]*?sqref=")[^"]*(")/,`$1${dv}$2`]]},po:{rows:pr,lastCol:'Q'},mats,itemCount:item}; };
   AV._rd=rd; AV._g6=g6; AV._ftIn=ftIn;
 })(typeof window!=='undefined'?window:globalThis);
