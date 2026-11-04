@@ -104,7 +104,7 @@ details.sec>div{padding-top:10px;display:flex;flex-direction:column;gap:10px}
   <header>
     <div>
       <h1>Nuevo proyecto · BOM, IFC y pernos</h1>
-      <p class="sub">Carga el BOM tal como sale de Tekla y descarga cinco Excel: <b>BOM trabajado</b> (BOM, compra, placas y pernos), <b>Lista por materiales</b> (una hoja por perfil y PLATES LISTADO, con el dibujo de cada pieza), <b>PR para SAP</b>, <b>Lista de troquelados</b> (piezas principales con su troquel y su QR al visor 3D) y <b>Plan de corte</b> (del Optimizador de cortes, al final de la página). Con varias unidades, la compra y el corte van juntos y los troquelados por unidad.</p>
+      <p class="sub">Carga el BOM tal como sale de Tekla y descarga cuatro Excel: <b>BOM trabajado</b> (BOM, compra, placas y pernos), <b>PR para SAP</b>, <b>Lista de troquelados</b> (piezas principales con su troquel y su QR al visor 3D) y <b>Plan de corte</b> (del Optimizador de cortes, al final de la página). Con varias unidades, la compra y el corte van juntos y los troquelados por unidad.</p>
     </div>
     <span class="tag" id="srcTag">Ejemplo: BOM US068.1</span>
   </header>
@@ -217,7 +217,7 @@ details.sec>div{padding-top:10px;display:flex;flex-direction:column;gap:10px}
     <section class="panel" aria-label="Resultado" id="out">
       <div class="topbar">
         <div class="checks" id="checks"></div>
-        <span class="dlbtns"><button class="big" id="dl" title="BOM original, BOM trabajado con la compra, Plates y Bolts">Descargar BOM trabajado</button><button class="big" id="dlM" title="Una hoja por material (perfiles) y PLATES LISTADO, con el dibujo de cada pieza">Descargar Lista por materiales</button><button class="big" id="dlPR" title="Excel para crear la PR en la ME51N: items para pegar, defaults y texto de cada línea">Descargar PR para SAP</button><button class="big" id="dlT" title="Lista de troquelados: una hoja por material con las piezas principales, su troquel y su QR">Descargar Lista de troquelados</button><button class="big" id="dlC" title="Excel del optimizador: compra, plan de corte con dibujo de cada barra, acomodo de placas, grating y una hoja de piezas por unidad">Descargar plan de corte</button></span>
+        <span class="dlbtns"><button class="big" id="dl" title="BOM original, BOM trabajado con la compra, Plates y Bolts">Descargar BOM trabajado</button><button class="big" id="dlM" style="display:none" title="Una hoja por material (perfiles) y PLATES LISTADO, con el dibujo de cada pieza">Descargar Lista por materiales</button><button class="big" id="dlPR" title="Excel para crear la PR en la ME51N: items para pegar, defaults y texto de cada línea">Descargar PR para SAP</button><button class="big" id="dlT" title="Lista de troquelados: una hoja por material con las piezas principales, su troquel y su QR">Descargar Lista de troquelados</button><button class="big" id="dlC" title="Excel del optimizador: compra, plan de corte con dibujo de cada barra, acomodo de placas, grating y una hoja de piezas por unidad">Descargar plan de corte</button></span>
       </div>
 
       <section id="ocSec" aria-label="Optimizador de cortes" style="border-top:1px solid var(--line);padding-top:12px">
