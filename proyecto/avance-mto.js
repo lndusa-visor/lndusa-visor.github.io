@@ -21,8 +21,8 @@
 
   /* partes del BOM: lee las filas P y H de la hoja (columna AP), generada o de un Excel existente */
   AV.mtoParts=function(S){ const out=[]; let asm=null;
-    S.rows.forEach(R=>{ const c={}; R.cells.forEach(x=>c[x.c]=x); const t=c.AP&&c.AP.v, v=k=>c[k]?c[k].v:null; if(t==='A') asm=v('B');
-      if(t==='P'||t==='H') out.push({asm,mark:v('B'),qty:v('D'),desc:v('E'),grade:v('F'),len:ftIn(v('G')),wt:v('H')}); });
+    let asmRow=null; S.rows.forEach(R=>{ const c={}; R.cells.forEach(x=>c[x.c]=x); const t=c.AP&&c.AP.v, v=k=>c[k]?c[k].v:null; if(t==='A'){ asm=v('B'); asmRow=R.r; }
+      if(t==='P'||t==='H') out.push({asm,asmRow,row:R.r,mark:v('B'),qty:v('D'),desc:v('E'),grade:v('F'),lenTxt:v('G'),len:ftIn(v('G')),wt:v('H'),twt:c.I?c.I.v:null}); });
     return out; };
 
   function bestFit(pieces,S,kerf,trim){ const bars=[]; pieces.forEach(p=>{ const need=p.len+kerf; let b=null; for(const x of bars) if(x.free>=need-1e-9&&(!b||x.free<b.free)) b=x; if(!b){ b={free:S-trim,items:[],used:0}; bars.push(b); } b.items.push(p); b.free-=need; b.used+=need; }); return bars; }
@@ -206,5 +206,29 @@
   // anclajes del modelo 3D: se suman de la columna Q de la hoja BOM («Anchored … ×4» por pieza)
   AV.anchorModel=function(S){ let pl=0,tot=0,per=null,mixed=false; S.rows.forEach(R=>{ const c={}; R.cells.forEach(x=>c[x.c]=x); const t=c.AP&&c.AP.v; if(t!=='A') return; const m=String(c.Q&&c.Q.v||'').match(/anchored [^×]*×(\d+)/i); if(!m) return; const q=+c.D.v, n=+m[1]; pl+=q; tot+=q*n; if(per==null) per=n; else if(per!==n) mixed=true; });
     return tot?{model:tot,basePlates:mixed?null:pl,perPlate:mixed?null:per}:null; };
+
+  /* ---- CUTTING TRACKING: una línea por parte del BOM, ligada a la hoja BOM; la tabla diaria siempre tiene 120 días (filas 11–130) ---- */
+  const serial=d=>{ const t=d instanceof Date?d:new Date(String(d).slice(0,10)+'T00:00:00Z'); return Math.round((Date.UTC(t.getUTCFullYear(),t.getUTCMonth(),t.getUTCDate())-Date.UTC(1899,11,30))/864e5); };
+  AV.cuttingSheet=function(o,parts){ const n=parts.length, f=11, l=10+n, BS=`'${o.bomSheet}'!`, DAYS=130, st=serial(o.startDate), rows=[];
+    const rng=c=>`$${c}$${f}:$${c}$${l}`, QD=[['I','J'],['K','L'],['M','N'],['O','P'],['Q','R'],['S','T']], isP=p=>kind(p.desc)==='PLATE';
+    const tot=parts.reduce((a,p)=>{ const t=isP(p)?1:0; a.q[t]+=p.qty; a.l[t]++; a.w+=(p.twt!=null?p.twt:p.qty*p.wt); return a; },{q:[0,0],l:[0,0],w:0});
+    rows.push(noteRow(1,60,'CUTTING TRACKING – PROFILES AND PLATES','18',true),noteRow(2,61,'One line per BOM part (read from the BOM sheet). Each day pieces are cut, enter the QTY. and DATE in the next free entry (up to 6 per line): the ✔ is set automatically when the sum reaches the required quantity.'));
+    const NOTE='H62 I62 J62 K62 L62 M62 N62 O62 P62', H4={H:txt('% CUT = parts cut ÷ parts required (same as X9). Not all parts are cut on the same day: each line has 6 cut entries (QTY. and DATE). TOTAL QTY. CUT = sum of the entries; LAST CUT = most recent date. In red: quantity without date or total above the required quantity.')};
+    rows.push({r:4,ht:'30',ch:true,cells:cells(`A7 B7 C7 D7 E7 F7 ${NOTE}`,Object.assign({A:txt('TYPE'),B:txt('LINES'),C:txt('LINES CUT ✔'),D:txt('PARTS REQUIRED'),E:txt('PARTS CUT'),F:txt('% CUT (parts)')},H4))});
+    ['PROFILE','PLATE'].forEach((t,i)=>{ const r=5+i; rows.push({r,ht:'15',ch:false,cells:cells(`A63 B64 C64 D64 E64 F65 ${NOTE}`,{A:txt(t),B:fx(`COUNTIF(${rng('D')},A${r})`,tot.l[i]),C:fx(`COUNTIFS(${rng('D')},A${r},${rng('W')},"☑")`,0),D:fx(`SUMIFS(${rng('H')},${rng('D')},A${r})`,tot.q[i]),E:fx(`SUMIFS(${rng('U')},${rng('D')},A${r})`,0),F:fx(`IFERROR(E${r}/D${r},0)`,0)})}); });
+    rows.push({r:7,ht:'15',ch:false,cells:cells(`A66 B54 C54 D54 E54 F53 ${NOTE}`,{A:txt('TOTAL'),B:fx('SUM(B5:B6)',n),C:fx('SUM(C5:C6)',0),D:fx('SUM(D5:D6)',tot.q[0]+tot.q[1]),E:fx('SUM(E5:E6)',0),F:fx('IFERROR(E7/D7,0)',0)})});
+    rows.push({r:8,ht:'15',ch:false,cells:cells('AB67',{AB:txt('CUTS PER DAY')})});
+    const colDates=QD.map(q=>rng(q[1])).join(','), S9=c=>fx(`SUM(${c}11:${c}666)`,c==='H'?tot.q[0]+tot.q[1]:c==='Y'?tot.w:0);
+    rows.push({r:9,ht:'15',ch:false,cells:cells('G68 H55 I55 J69 K55 L69 M55 N69 O55 P69 Q55 R69 S55 T69 U55 V69 W54 X53 Y55 Z55 AB70 AC71',{G:txt('TOTAL'),H:S9('H'),I:S9('I'),K:S9('K'),M:S9('M'),O:S9('O'),Q:S9('Q'),S:S9('S'),U:S9('U'),W:fx('COUNTIF(W11:W666,"☑")',0),X:fx('IFERROR(U9/H9,0)',0),Y:S9('Y'),Z:S9('Z'),AB:txt('First day'),AC:fx(`IF(COUNT(${colDates})=0,'DAILY REPORT'!$C$7,MIN(${colDates}))`,st)})});
+    const HH=['ITEM','ASSEMBLY','PART','TYPE','DESCRIPTION','GRADE','LENGTH','QTY. REQUIRED','QTY. CUT 1','CUT DATE 1','QTY. CUT 2','CUT DATE 2','QTY. CUT 3','CUT DATE 3','QTY. CUT 4','CUT DATE 4','QTY. CUT 5','CUT DATE 5','QTY. CUT 6','CUT DATE 6','TOTAL QTY. CUT','LAST CUT','CUT ✔','% CUT','WEIGHT (lb)','WEIGHT CUT (lb)'], HC='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    rows.push({r:10,ht:'31.5',ch:true,cells:HC.map((c,i)=>({c,s:7,v:HH[i]})).concat([['AB','DATE'],['AC','PARTS CUT (day)'],['AD','PARTS CUT (cum.)'],['AE','% CUT (parts)'],['AF','WEIGHT CUT DAY (lb)']].map(([c,v])=>({c,s:7,v})))});
+    const PS='A64 B33 C29 D29 E10 F10 G10 H64 I34 J37 K34 L37 M34 N37 O34 P37 Q34 R37 S34 T37 U72 V73 W35 X74 Y38 Z38', DS='AB73 AC75 AD75 AE76 AF75';
+    for(let i=0;i<Math.max(n,DAYS-10);i++){ const r=f+i, p=parts[i], v={};
+      if(p){ const q=p.row, W=p.twt!=null?p.twt:p.qty*p.wt; Object.assign(v,{A:num(i+1),B:fx(`${BS}B${p.asmRow}`,p.asm),C:fx(`${BS}B${q}`,p.mark),D:txt(isP(p)?'PLATE':'PROFILE'),E:fx(`${BS}E${q}`,p.desc),F:fx(`${BS}F${q}`,p.grade),G:fx(`${BS}G${q}`,p.lenTxt),H:fx(`${BS}D${q}`,p.qty),
+          U:fx(`N(I${r})+N(K${r})+N(M${r})+N(O${r})+N(Q${r})+N(S${r})`,0),V:fx(`IF(COUNT(J${r},L${r},N${r},P${r},R${r},T${r})=0,"",MAX(J${r},L${r},N${r},P${r},R${r},T${r}))`,''),W:fx(`IF(AND(U${r}>0,U${r}>=H${r}),"☑","☐")`,'☐'),X:fx(`IFERROR(MIN(1,U${r}/H${r}),0)`,0),Y:fx(`${BS}I${q}`,W),Z:fx(`Y${r}*X${r}`,0)}); }
+      if(r<=DAYS) Object.assign(v,{AB:fx(r===f?'$AC$9':`AB${r-1}+1`,st+i),AC:{f:`IF(AB${r}<=TODAY(),${QD.map(([a,b])=>`SUMIFS(${rng(a)},${rng(b)},AB${r})`).join('+')},"")`},AD:{f:r===f?`IF(AB${r}<=TODAY(),AC${r},"")`:`IF(AB${r}<=TODAY(),N(AD${r-1})+AC${r},"")`},AE:{f:`IF(AB${r}<=TODAY(),IFERROR(AD${r}/$H$9,0),"")`},
+        AF:{f:`IF(AB${r}<=TODAY(),${QD.map(([a,b])=>`SUMPRODUCT((${rng(b)}=AB${r})*${rng(a)}*${rng('Y')}/${rng('H')})`).join('+')},"")`}});
+      rows.push({r,ht:'15',ch:false,cells:cells([p?PS:'',r<=DAYS?DS:''].filter(Boolean).join(' '),v)}); }
+    return {rows,lastCol:'AF',filter:`$A$10:$Z$${l}`,merges:['H4:P7'],subst:[[/<autoFilter ref="[^"]*">/,`<autoFilter ref="A10:Z${l}">`],[/sqref="[^"]*"/g,m=>m.replace(/([A-Z]+11:[A-Z]+)\d+/g,`$1${l}`)]]}; };
   AV._rd=rd; AV._g6=g6; AV._ftIn=ftIn;
 })(typeof window!=='undefined'?window:globalThis);

@@ -47,10 +47,14 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 - Mismo diseño y fórmulas; solo cambian los datos del proyecto. PURCHASE ORDERS sale sin órdenes. Comparadas contra 55 m.
 - AV.vendorSheets devuelve mats (clave de material → fila), que necesitará 3D CONTROL. Probadas también de punta a punta.
 
+## CUTTING TRACKING (AV.cuttingSheet en avance-mto.js)
+- Una línea por parte, ligada a la hoja BOM; tabla diaria fija de 120 días (filas 11–130, la usa la gráfica). 0 diferencias en 30 m y 55 m desde los archivos de origen. Fecha inicial = DAILY REPORT C7.
+- Los números de estilo cambian entre los Excel de 30 y 55: la plantilla final usará un solo styles.xml; la prueba compara la apariencia real de cada celda.
+
 ## Control de pruebas
 - Los troqueles de la columna Z de BOM CONNECTION no los pone el generador: los agrega el paso «Agregar al Excel de avance». Falta encadenarlo.
 
 ## Siguiente
 1. Generador JS (Node + navegador) hoja por hoja, comparando celda por celda contra b30/b55.
-2. Orden: BOM CONNECTION (hecha) → TAKEOFF/MTO/CUTTING PLAN/NESTING (hechas) → VENDOR REQ/PO (hechas) → CUTTING TRACKING → WELDING → PAINTING → 3D CONTROL → DAILY/WEEKLY.
+2. Orden: BOM CONNECTION (hecha) → TAKEOFF/MTO/CUTTING PLAN/NESTING (hechas) → VENDOR REQ/PO (hechas) → CUTTING TRACKING (hecha) → WELDING → PAINTING → 3D CONTROL → DAILY/WEEKLY.
 3. Tablero: SCENES (partes, soldaduras, pernos, ptp, grid, info) desde el IFC.
