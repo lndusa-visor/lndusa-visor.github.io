@@ -138,14 +138,14 @@ details.sec>div{padding-top:10px;display:flex;flex-direction:column;gap:10px}
           <div class="field"><label class="hint" for="pname">Nombre del proyecto</label><input type="text" id="pname" value=""></div>
           <div class="row" style="align-items:center;margin-top:4px"><span class="hint" id="codeHint" aria-live="polite">Escribe el código antes de generar los QR.</span><button type="button" class="ghost" id="codeOk" hidden>Confirmar código</button></div>
         </div>
-        <div class="drop" id="dropParts" style="cursor:default">
+        <div class="drop" id="dropParts" style="display:none">
           <b>Dibujos de partes (opcional)</b>
           <span class="hint">Carpeta con un archivo por marca: <b>NC1</b> de Tekla (perfiles y placas), <b>DXF</b> o <b>plano PDF</b> (placas). El nombre del archivo debe ser la marca, p. ej. <code>WTS-VB1.nc1</code>, <code>WTS-p13.dxf</code>, <code>p13.pdf</code>. El dibujo sale en cada línea de las hojas por material. Si cargaste el IFC no hace falta: las piezas ya salen dibujadas con su forma real; esto es solo para marcas que no estén en el IFC.</span>
           <span class="row"><button class="ghost" type="button" id="partsDir">Elegir carpeta</button><button class="ghost" type="button" id="partsFiles">Elegir archivos</button><button class="ghost" type="button" id="partsClear" hidden>Quitar</button></span>
           <input type="file" id="partsDirIn" webkitdirectory directory multiple hidden>
           <input type="file" id="partsFilesIn" multiple accept=".nc1,.nc,.dxf,.pdf" hidden>
         </div>
-        <div id="partsInfo" class="hint" aria-live="polite"></div>
+        <div id="partsInfo" class="hint" aria-live="polite" style="display:none"></div>
         <div class="drop" style="cursor:default">
           <b>QR al visor 3D (Lista de troquelados)</b>
           <span class="hint">La Lista de troquelados lleva un QR por pieza (1 de N; ángulos, shims, arandelas y shear plates uno solo) que abre el visor 3D en cualquier teléfono. Déjalo vacío para usar el visor del proyecto en GitHub (lndusa-visor.github.io/CÓDIGO/).</span>
@@ -3889,6 +3889,9 @@ function renderPreview(s){
 $('area').addEventListener('change',()=>{ const m=store.get('areaByProj',{}); m[projKey(P&&P.meta?P.meta.project:'')]=$('area').value.trim(); store.set('areaByProj',m); build(); });
 $('code').addEventListener('change',()=>{ const d=deriveCode($('code').value,''); if(d) $('short').value=d.short; codePending=!$('code').value.trim(); codeState(); build(); });
 $('codeOk').onclick=()=>{ codePending=false; codeState(); };
+// al escribir, o si el navegador conserva el código al recargar, el aviso se actualiza
+$('code').addEventListener('input',()=>{ codePending=!$('code').value.trim(); codeState(); });
+{ const c=$('code').value.trim(); if(c&&/^US\.\d{3}\.\d+$/.test(c)) codePending=false; codeState(); }
 
 /* ---------- Excel de salida ---------- */
 const BORDER={top:{style:'thin',color:{rgb:'9DB3C8'}},bottom:{style:'thin',color:{rgb:'9DB3C8'}},left:{style:'thin',color:{rgb:'9DB3C8'}},right:{style:'thin',color:{rgb:'9DB3C8'}}};
