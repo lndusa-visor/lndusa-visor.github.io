@@ -163,7 +163,8 @@ details.sec>div{padding-top:10px;display:flex;flex-direction:column;gap:10px}
           </div>
           <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
             <b>Generar Excel de avance</b>
-            <span class="hint">Con el BOM, el IFC y el Bolt Summary cargados, arma el Excel de avance completo de cada unidad, con los troqueles y las pestañas LISTA DE TROQUELADOS, PR SAP y PLAN DE CORTE. Usa los largos de barra y la lámina que elegiste abajo.</span>
+            <span class="hint">Con el BOM, el IFC y el Bolt Summary cargados, arma el Excel de avance completo de cada unidad, con los troqueles y las pestañas LISTA DE TROQUELADOS, PR SAP y PLAN DE CORTE. Usa la tabla de materiales de aquí abajo y la lámina elegida en el optimizador.</span>
+            <div id="matBox" style="margin-top:8px;overflow-x:auto"></div>
             <div class="row" style="margin-top:8px;align-items:center"><div class="field" style="flex:0 1 170px"><label class="hint" for="avStart">Fecha de inicio</label><input type="date" id="avStart"></div><button type="button" id="avGen">Generar Excel de avance</button><span class="hint" id="avGenInfo" aria-live="polite"></span></div>
           </div>
           <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
@@ -836,8 +837,7 @@ function run(){
   const groups=new Map();
   allItems().filter(i=>i.kind==='profile').forEach(i=>{ const k=i.desc+'|'+i.grade; if(!groups.has(k)) groups.set(k,{prof:i.desc,grade:i.grade,pieces:[]}); const g=groups.get(k); for(let q=0;q<i.qty;q++) g.pieces.push({mark:uLab(i),unit:i.unit||null,st:stOf(i),len:i.len,extra:!!i.extra}); });
   const profs=[...groups.entries()].map(([k,g])=>{
-    const pool=st.stocks, kf=kerfQ['P|'+k]!=null?kerfQ['P|'+k]/12:st.kerf;
-    const f=forced[k]&&pool.includes(forced[k])?forced[k]:null;
+    const kf=kerfQ['P|'+k]!=null?kerfQ['P|'+k]/12:st.kerf, f=forced[k]||null, pool=f&&!st.stocks.includes(f)?st.stocks.concat(f):st.stocks;   // el largo elegido en la tabla de materiales vale aunque no esté entre los comerciales marcados
     const inv=manualInv(k)||invProf(g.prof);
     let bars=[], over=[], pending=[], unused=[];
     if(inv.length){
@@ -858,7 +858,7 @@ function run(){
     const longest=g.pieces.reduce((a,p)=>Math.max(a,p.len),0);
     const bad=bars.filter(b=>b.items.some(x=>x.len+kf>b.stock-st.trim+1e-9)).length;
     // cómo saldría con cada largo comercial, para comparar en el selector
-    const alts=pool.filter(L=>L-st.trim>=longest+kf-1e-9).map(L=>{ const o=optimize(g.pieces,pool,kf,st.trim,false,L); const t=o.bars.reduce((a,b)=>a+b.stock,0); return {L,n:o.bars.length,total:t,util:t?g.pieces.reduce((a,p)=>a+p.len,0)/t:0}; });
+    const alts=[...new Set(pool.concat([25,30,35]))].sort((a,b)=>a-b).filter(L=>L-st.trim>=longest+kf-1e-9).map(L=>{ const o=optimize(g.pieces,[L],kf,st.trim,false,L); const t=o.bars.reduce((a,b)=>a+b.stock,0); return {L,n:o.bars.length,total:t,util:t?g.pieces.reduce((a,p)=>a+p.len,0)/t:0}; });
     return {k,...g,bars,over,pending,unused,inv,net,total,bought,forced:f,longest,bad,pool,alts,kerf:kf,xq:xq||null};
   }).sort((a,b)=>a.prof.localeCompare(b.prof,'en',{numeric:true}));
   // placas
@@ -2023,7 +2023,7 @@ function fromDesglose(aoa,name,units,label,outName){
   setProject(aoa,''); setItemsFromRead(res,label||'BOM del desglose');
 }
 function renameUnit(o,n){ UNITS=UNITS.map(u=>u===o?n:u); items.forEach(i=>{ if(i.unit===o) i.unit=n; }); if(items.length) run(); }
-window.OC={fromDesglose,renameUnit,loadIFCs:fs=>loadIFCs(fs),download:()=>download(),setOut:n=>{ OUTNAME=n; },result:()=>last,setStamps,setProject:t=>{ const el=$('projIn'); if(el&&t){ el.value=t; el.dataset.user='1'; } },get ready(){ return !!items.length; }};
+window.OC={force:(k,v)=>{ forced[k]=v?+v:null; run(); },fromDesglose,renameUnit,loadIFCs:fs=>loadIFCs(fs),download:()=>download(),setOut:n=>{ OUTNAME=n; },result:()=>last,setStamps,setProject:t=>{ const el=$('projIn'); if(el&&t){ el.value=t; el.dataset.user='1'; } },get ready(){ return !!items.length; }};
 function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,3200);}
 function copy(text,msg){
   const fb=()=>{ const t=document.createElement('textarea'); t.value=text; t.style.position='fixed'; t.style.opacity='0'; document.body.appendChild(t); t.select(); let ok=false; try{ok=document.execCommand('copy')}catch(e){} t.remove(); toast(ok?msg:'No se pudo copiar automáticamente.'); };
@@ -4145,7 +4145,12 @@ function rowStamps(){ const o={}; if(!P) return o; const uni=!!(P.unitMode&&P.un
 function ocSync(){ try{ if(!window.OC||!OC.setStamps||!P) return; const code=$('code').value.trim(), pn=$('pname').value.trim()||P.meta.project||'';
   OC.setProject(`${code} ${pn}`.trim()); OC.setStamps(rowStamps()); }catch(e){ console.warn('troqueles al optimizador',e); } }
 // cuando cambias algo en el optimizador, la compra del desglose (y la PR) se recalcula
-let ocT=null; window.OC_onRun=()=>{ clearTimeout(ocT); ocT=setTimeout(()=>{ if(P&&!ocFeeding) try{ build(); }catch(e){ console.warn(e); } },120); };
+let ocT=null; window.OC_onRun=()=>{ clearTimeout(ocT); ocT=setTimeout(()=>{ if(P&&!ocFeeding) try{ build(); }catch(e){ console.warn(e); } try{ renderMat(); }catch(e){ console.warn(e); } },120); };
+/* tabla de materiales de todo el proyecto: de aquí salen el MTO SUMMARY y los planes de corte. Solo ofrece barras donde cabe la pieza más larga. */
+function renderMat(){ const box=$('matBox'), R=ocResult(); if(!box) return; if(!R||!R.profs.length){ box.innerHTML=''; return; } const row=p=>{ const one=[...new Set(p.bars.filter(b=>!b.extraBar&&(!b.sup||b.sup==='FALTA')).map(b=>b.stock+"'"))], o=`<option value="">Auto${one.length?' · '+one.join('+'):''}</option>`+p.alts.map(a=>`<option value="${a.L}" ${p.forced===a.L?'selected':''}>${a.L}' · ${a.n} barra${a.n===1?'':'s'}</option>`).join('');
+    return `<div style="padding:7px 0;border-top:1px solid var(--line);font-size:13px"><div><span style="font-weight:700">${esc(p.prof)}</span> · ${esc(p.grade||'—')} · pieza más larga ${esc(fmtFtIn(p.longest))}</div><select data-mk="${esc(p.k)}" aria-label="Largo de barra para ${esc(p.prof)}" style="width:100%;margin-top:4px">${o}</select><div class="hint">${p.bars.length} barras · aprovechamiento ${p.total?Math.round(p.net/p.total*100):0} %${p.over.length?' · <span style="color:var(--bad)">no cabe</span>':''}${!p.forced&&one.length>1?' · <span style="color:var(--bad)">elige un largo</span>':''}</div></div>`; };
+  box.innerHTML=`<div style="font-size:13px;font-weight:700;margin-bottom:4px">Materiales de todo el proyecto</div>${R.profs.map(row).join('')}<span class="hint">Una elección por material. Con esto salen el MTO SUMMARY y los planes de corte de cada unidad.</span>`;
+  box.querySelectorAll('select[data-mk]').forEach(s=>s.onchange=()=>OC.force(s.dataset.mk,s.value)); }
 $('dlC').onclick=()=>{ if(!window.OC||!OC.ready){ toast('El optimizador no cargó. Revisa la conexión y vuelve a abrir la página.'); return; } OC.setOut(`${fileBase.replace(/[_ -]+Copy$/i,'')}_${(window.I18N?I18N.tr:(x=>x))('Plan de corte')}.xlsx`); OC.download(); };
 function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,3500);}
 
@@ -4369,7 +4374,7 @@ load(RAW_SAMPLE,'BESS Area PDC and Transformer','Ejemplo: BESS Assembly List BOM
     btn.disabled=true; if(!(await window.ensureVisorLive(info))) return; info('Preparando…');
     const [tR,jR]=await Promise.all([fetch('avance-plantilla.xlsx',{cache:'no-store'}),fetch('avance-tpl-bom.json',{cache:'no-store'})]); if(!tR.ok||!jR.ok) throw new Error('No pude leer la plantilla del Excel.');
     const tpl=await tR.arrayBuffer(), bt=await jR.json(), stock={}; let free=[];
-    book.profs.forEach(p=>{ const k=String(p.prof).split('|')[0], v=typeof p.stock==='number'?p.stock:(typeof p.sel==='number'?p.sel:+p.sel); if(v>0) stock[k]=v; else free.push(k); });
+    book.profs.forEach(p=>{ const k=String(p.prof).split('|')[0], v=typeof p.sel==='number'?p.sel:(p.sel==='Mix'?0:+p.sel||p.stock); if(v>0) stock[k]=v; else free.push(k); });   // lo elegido en la tabla de materiales: MTO, plan por perfil y Plan de corte usan el mismo largo
     if(free.length){ info('Elige un largo fijo para: '+[...new Set(free)].join(', ')); return; }
     const a=(book.ths[0]&&book.ths[0].sheetA)||32, sheet=AREA_SZ[a]||[4,8], units=P.unitMode&&P.units&&P.units.length>1?P.units.map(u=>u.label):[undefined], over=[]; let n=0;
     for(const u of units){ info(`Generando ${u||'el proyecto'}…`); const G=await AV.generate(tpl.slice(0),bt,{unit:u,stock,sheet,startDate:st.value||new Date().toISOString().slice(0,10),kerf:(+$i('kerf').value||0.125),trim:(+$i('trim').value||0.5),gap:(+$i('plGap').value||0.25),edge:(+$i('plEdge').value||0.5)});

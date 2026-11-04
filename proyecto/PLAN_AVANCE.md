@@ -114,6 +114,11 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 - Corregido en la plantilla, en tools/avance_plantilla.py y en addToAvance (AV.fixCharts). Solo cambia chart*.xml y drawing*.xml.
 - Falta confirmar en Excel real con la copia corregida.
 
+## Materiales del proyecto (renderMat en index.html)
+- Una elección de barra por material para todo el proyecto. Usa OC.force: es el mismo valor del optimizador, así que MTO SUMMARY, PROFILE CUTTING PLAN y Plan de corte salen con el mismo largo. Generar Excel ahora lee p.sel, no p.stock.
+- Excel no rehace el plan al cambiar una celda: la elección va en la página, antes de generar.
+- MTO SUMMARY: columna N «LONGEST PIECE (PROJECT)», dato sin fórmula, de todo el proyecto. Las barras de cada unidad se calculan con sus piezas; el Plan de corte conjunto puede dar otro total.
+
 ## Control de pruebas
 - Los troqueles de la columna Z de BOM CONNECTION no los pone el generador: los agrega el paso «Agregar al Excel de avance». Falta encadenarlo.
 
