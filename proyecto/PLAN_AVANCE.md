@@ -104,9 +104,13 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 - Código y Nombre están junto a la carga de archivos. Un código sin número de unidad queda «por confirmar» y detiene los QR y la publicación hasta corregirlo o presionar «Confirmar código». Los botones de carga no van en el tablero: «+ Nuevo proyecto» abre esa página.
 - Probado con publicación y GitHub simulados; falta la prueba con un proyecto real en main.
 
+## WEEKLY NOTES en proyectos nuevos
+- Regla del usuario: se pueden cargar proyectos nuevos sin tocar ninguna fórmula.
+- El Excel nuevo sale sin notas: se vacían B:K de las filas 6–12; quedan numeración, listas y la fórmula OVERDUE. Los Excel existentes no se tocan.
+- WEEKLY CUT-OFFS B4 (dato, no fórmula) = primer viernes desde la fecha de inicio.
+
 ## Control de pruebas
 - Los troqueles de la columna Z de BOM CONNECTION no los pone el generador: los agrega el paso «Agregar al Excel de avance». Falta encadenarlo.
 
 ## Siguiente
-1. Decidir el cronograma de WEEKLY NOTES.
-2. Prueba en Excel real y en navegador real, y publicar en main.
+1. Prueba en Excel real y en navegador real, y publicar en main.

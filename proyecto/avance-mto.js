@@ -358,12 +358,11 @@
   function setCell(x,ref,val){ const re=new RegExp(`<c r="${ref}"([^>]*?)(?:/>|>[\\s\\S]*?</c>)`); return x.replace(re,(m,at)=>{ const s=(at.match(/ s="\d+"/)||[''])[0]; return typeof val==='number'?`<c r="${ref}"${s}><v>${val}</v></c>`:`<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(val)}</t></is></c>`; }); }
   const cellText=(x,ref,sst)=>{ const m=x.match(new RegExp(`<c r="${ref}"[^>]*?t="s"[^>]*><v>(\\d+)</v>`)); return m?sst[+m[1]]:''; };
   AV.finishSheets=function(tpl,sst,T,o){ const N={bomSheet:o.bomSheet,bomLast:o.bomLast,bomTot:o.bomTotalRow,ctlLast:o.ctlLast,wTot:o.wTot}, out={daily:retarget(tpl.daily,T,N),cuts:retarget(tpl.cuts,T,N)};
-    const L=o.loose||[], top=L.slice().sort((a,b)=>b.qty-a.qty)[0], lEn=L.map(l=>`${l.mark} ×${l.qty} under ${l.asm}`).join(' · '), lEs=L.map(l=>`${l.mark} ×${l.qty} bajo ${l.asm}`).join(' · '), A=o.anchors||{}, gr=`${o.grout||0}`, gm=o.groutMark||'';
-    let n=retarget(tpl.notes,T,N); const nt=r=>cellText(n,r,sst);
-    const shop=o.shopBolt?`(${o.shopBolt})`:'', F6=nt('F6').replace(/\([^()]*\bunder\b[^()]*\)/,`(${lEn})`).replace(/\(A325N Ø[^()]*\)/,shop), G6=nt('G6').replace(/\([^()]*\bbajo\b[^()]*\)/,`(${lEs})`).replace(/\(A325N Ø[^()]*\)/,shop);
-    const F7=nt('F7').replace(/lists \d+ .*? adhesive anchors; the IFC has \d+ \(\d+ base plates × \d+\)/,`lists ${A.n} ${A.desc} adhesive anchors; the IFC has ${A.model} (${A.basePlates} base plates × ${A.perPlate})`), G7=nt('G7').replace(/indica \d+ anclas adhesivas .*?; el IFC tiene \d+ \(\d+ placas base × \d+\)/,`indica ${A.n} anclas adhesivas ${A.desc}; el IFC tiene ${A.model} (${A.basePlates} placas base × ${A.perPlate})`);
-    const F9=nt('F9').replace(/^\d+ grout pads \([^)]*\)/,`${gr} grout pads (${gm})`), G9=nt('G9').replace(/^\d+ placas de grout \([^)]*\)/,`${gr} placas de grout (${gm})`);
-    [['E6',top?top.asm:''],['F6',F6],['G6',G6],['F7',F7],['G7',G7],['F9',F9],['G9',G9]].forEach(([r,v])=>{ n=setCell(n,r,v); }); out.notes=n;
+    const L=o.loose||[], lEn=L.map(l=>`${l.mark} ×${l.qty} under ${l.asm}`).join(' · '), A=o.anchors||{};
+    // proyecto nuevo: WEEKLY NOTES sale sin notas (se escriben a mano); solo se vacían los datos B:K de las filas escritas, nunca una fórmula
+    let n=retarget(tpl.notes,T,N); const clearCell=(x,ref)=>x.replace(new RegExp(`<c r="${ref}"([^>]*?)(?:/>|>[\\s\\S]*?</c>)`),(m,at)=>`<c r="${ref}"${(at.match(/ s="\d+"/)||[''])[0]}/>`);
+    for(let r=6;r<=12;r++) 'BCDEFGHIJK'.split('').forEach(c=>{ n=clearCell(n,c+r); }); out.notes=n;
+    const d0=new Date(`${o.startDate}T12:00:00`); out.cuts=setCell(out.cuts,'B4',serial(o.startDate)+((5-d0.getDay()+7)%7));   // primer corte: primer viernes desde la fecha de inicio
     let c=retarget(tpl.summary,T,N); const ct=r=>cellText(c,r,sst), A16=ct('A16').replace(/\([^()]*\bunder\b[^()]*?, shop bolted/,`(${lEn}, shop bolted`), bd=o.boltDoc;
     [['A1',`SUMMARY – CONNECTION TYPE (${o.proj})`],['E12',`Bolt Summary ${bd} – SHOP BOLT`],['E13',`Bolt Summary ${bd} – FIELD BOLT`],['A14',`Adhesive anchors ${A.desc}`],['C14',A.model],['E14',`IFC ${A.model} (${A.basePlates} base plates × ${A.perPlate}) · Bolt Summary ${A.n}`],['A16',A16]].forEach(([r,v])=>{ c=setCell(c,r,v); }); out.summary=c; return out; };
   AV.looseList=M=>{ const o=[]; M.forEach(x=>(x.lp||[]).forEach(l=>o.push({mark:l.mark,qty:l.qty,asm:x.mark}))); return o; };
