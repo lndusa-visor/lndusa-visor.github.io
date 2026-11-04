@@ -102,14 +102,54 @@ table.pt a{color:var(--steel);font-weight:600} table.pt small{color:var(--oxide)
     refs(ent.get(sh)[1]).forEach(f=>{ const b=refs(ent.get(f)[1])[0]; const fb=ent.get(b); if(!fb) return; const loop=refs(fb[1])[0]; out.push(refs(ent.get(loop)[1]).map(pt)); });
     return out;
   }
+  // sólidos extruidos (Tekla «SweptSolid», «Clipping», «CSG»): perfil 2D × profundidad; los cortes con semiespacio se aplican, los demás cortes se ignoran
+  function ax2(id){ if(!id) return [[1,0],[0,1],[0,0]]; const a=A(id); const o=pt(refs(a[0])[0]).slice(0,2); let x=a[1]&&a[1]!=='$'?pt(refs(a[1])[0]).slice(0,2):[1,0]; const n=Math.hypot(...x)||1; x=x.map(c=>c/n); return [x,[-x[1],x[0]],o]; }
+  const ap2=(P,v)=>[P[0][0]*v[0]+P[1][0]*v[1]+P[2][0],P[0][1]*v[0]+P[1][1]*v[1]+P[2][1]];
+  function curvePts(id){ const e=ent.get(id); if(!e) return []; const a=split(e[1]);
+    if(e[0]==='IFCPOLYLINE') return refs(a[0]).map(p=>pt(p).slice(0,2));
+    if(e[0]==='IFCCOMPOSITECURVE'){ const out=[]; refs(a[0]).forEach(sg=>{ const g=split(ent.get(sg)[1]); let P=curvePts(refs(g[2])[0]); if(g[1]==='.F.') P=P.slice().reverse(); P.forEach(p=>{ const l=out[out.length-1]; if(!l||Math.hypot(l[0]-p[0],l[1]-p[1])>1e-6) out.push(p); }); }); return out; }
+    if(e[0]==='IFCTRIMMEDCURVE'){ const c=ent.get(refs(a[0])[0]); if(!c) return []; const ca=split(c[1]);
+      const t=x=>{ const m=String(x).match(/IFCPARAMETERVALUE\(([-\d.E+]+)\)/i); return m?+m[1]:null; };
+      if(c[0]==='IFCCIRCLE'){ const P=ax2(refs(ca[0])[0]), r=+ca[1]; let t1=t(a[1]), t2=t(a[2]); if(t1==null||t2==null) return []; const sense=a[3]!=='.F.';
+        if(sense&&t2<t1) t2+=Math.PI*2; if(!sense&&t2>t1) t2-=Math.PI*2; const n=Math.max(4,Math.ceil(Math.abs(t2-t1)/(Math.PI/12))), out=[];
+        for(let i=0;i<=n;i++){ const u=t1+(t2-t1)*i/n; out.push(ap2(P,[r*Math.cos(u),r*Math.sin(u)])); } return out; }
+      if(c[0]==='IFCLINE'){ return []; } }
+    return []; }
+  function profilePts(id){ const e=ent.get(id); if(!e) return []; const a=split(e[1]); const P=ax2(refs(a[2])[0]);
+    if(e[0]==='IFCARBITRARYCLOSEDPROFILEDEF'||e[0]==='IFCARBITRARYPROFILEDEFWITHVOIDS'){ const p=curvePts(refs(a[2])[0]); if(p.length>2){ const f=p[0],l=p[p.length-1]; if(Math.hypot(f[0]-l[0],f[1]-l[1])<1e-6) p.pop(); } return p; }
+    let q=[];
+    if(e[0]==='IFCRECTANGLEPROFILEDEF'){ const x=+a[3]/2, y=+a[4]/2; q=[[-x,-y],[x,-y],[x,y],[-x,y]]; }
+    else if(e[0]==='IFCCIRCLEPROFILEDEF'){ const r=+a[3]; for(let i=0;i<24;i++){ const u=i/24*Math.PI*2; q.push([r*Math.cos(u),r*Math.sin(u)]); } }
+    else if(e[0]==='IFCISHAPEPROFILEDEF'){ const b=+a[3]/2, d=+a[4]/2, w=+a[5]/2, f=+a[6]; q=[[-b,-d],[b,-d],[b,-d+f],[w,-d+f],[w,d-f],[b,d-f],[b,d],[-b,d],[-b,d-f],[-w,d-f],[-w,-d+f],[-b,-d+f]]; }
+    else if(e[0]==='IFCLSHAPEPROFILEDEF'){ const d=+a[3]/2, w=(a[4]&&a[4]!=='$'?+a[4]:+a[3])/2, t=+a[5]; q=[[-w,-d],[w,-d],[w,-d+t],[-w+t,-d+t],[-w+t,d],[-w,d]]; }
+    else if(e[0]==='IFCUSHAPEPROFILEDEF'){ const d=+a[3]/2, b=+a[4], w=+a[5], f=+a[6], x0=-b/2; q=[[x0,-d],[x0+b,-d],[x0+b,-d+f],[x0+w,-d+f],[x0+w,d-f],[x0+b,d-f],[x0+b,d],[x0,d]]; }
+    else if(e[0]==='IFCTSHAPEPROFILEDEF'){ const d=+a[3]/2, b=+a[4]/2, w=+a[5]/2, f=+a[6]; q=[[-w,-d],[w,-d],[w,d-f],[b,d-f],[b,d],[-b,d],[-b,d-f],[-w,d-f]]; }
+    else if(e[0]==='IFCRECTANGLEHOLLOWPROFILEDEF'){ const x=+a[3]/2, y=+a[4]/2; q=[[-x,-y],[x,-y],[x,y],[-x,y]]; }
+    else if(e[0]==='IFCCIRCLEHOLLOWPROFILEDEF'){ const r=+a[3]; for(let i=0;i<24;i++){ const u=i/24*Math.PI*2; q.push([r*Math.cos(u),r*Math.sin(u)]); } }
+    return q.map(v=>ap2(P,v)); }
+  function extrude(id){ const a=A(id); const p=profilePts(refs(a[0])[0]); if(p.length<3) return []; const M=ax3(refs(a[1])[0]); const dv=dir(refs(a[2])[0])||[0,0,1], h=+a[3];
+    const b=p.map(v=>apply(M,[v[0],v[1],0])), t=p.map(v=>apply(M,[v[0]+dv[0]*h,v[1]+dv[1]*h,dv[2]*h])); const out=[b.slice().reverse(),t];
+    for(let i=0;i<p.length;i++){ const j=(i+1)%p.length; out.push([b[i],b[j],t[j],t[i]]); } return out; }
+  function clipFaces(faces,o,n,keepPos){ const sd=v=>(dot(n,[v[0]-o[0],v[1]-o[1],v[2]-o[2]]))*(keepPos?1:-1); const out=[];
+    faces.forEach(f=>{ const r=[]; for(let i=0;i<f.length;i++){ const A1=f[i], B1=f[(i+1)%f.length], da=sd(A1), db=sd(B1);
+      if(da>=0) r.push(A1); if((da>=0)!==(db>=0)){ const u=da/(da-db); r.push([A1[0]+(B1[0]-A1[0])*u,A1[1]+(B1[1]-A1[1])*u,A1[2]+(B1[2]-A1[2])*u]); } }
+      if(r.length>=3) out.push(r); }); return out; }
+  function itemFaces(id,depth){ const e=ent.get(id); if(!e||(depth||0)>12) return [];
+    if(e[0]==='IFCFACETEDBREP') return brepFaces(id);
+    if(e[0]==='IFCEXTRUDEDAREASOLID') return extrude(id);
+    if(e[0]==='IFCBOOLEANCLIPPINGRESULT'||e[0]==='IFCBOOLEANRESULT'){ const a=split(e[1]); let f=itemFaces(refs(a[1])[0],(depth||0)+1);
+      const h=ent.get(refs(a[2])[0]);
+      if(a[0]==='.DIFFERENCE.'&&h&&h[0]==='IFCHALFSPACESOLID'){ const ha=split(h[1]), pl=ent.get(refs(ha[0])[0]); if(pl&&pl[0]==='IFCPLANE'){ const M=ax3(refs(split(pl[1])[0])[0]); f=clipFaces(f,M[3],M[2],ha[1]==='.T.'); } }
+      return f; }
+    return []; }
   function repItems(pdsId){ // [{faces,M}] en coords del producto
     const out=[]; const pds=A(pdsId); refs(pds[2]).forEach(sr=>{ const s=A(sr); if(str(s[1])!=='Body') return;
       refs(s[3]).forEach(it=>{ const e=ent.get(it); if(!e) return;
-        if(e[0]==='IFCFACETEDBREP') out.push({faces:brepFaces(it),M:I});
-        else if(e[0]==='IFCMAPPEDITEM'){ const mi=split(e[1]); const map=A(refs(mi[0])[0]); const org=ax3(refs(map[0])[0]); const op=A(refs(mi[1])[0]);
+        if(e[0]!=='IFCMAPPEDITEM'){ const f=itemFaces(it); if(f.length) out.push({faces:f,M:I}); }
+        if(e[0]==='IFCMAPPEDITEM'){ const mi=split(e[1]); const map=A(refs(mi[0])[0]); const org=ax3(refs(map[0])[0]); const op=A(refs(mi[1])[0]);
           const x=op[0]&&op[0]!=='$'?dir(refs(op[0])[0]):[1,0,0], y=op[1]&&op[1]!=='$'?dir(refs(op[1])[0]):[0,1,0], o=pt(refs(op[2])[0]), sc=op[3]&&op[3]!=='$'?+op[3]:1, z=op[4]&&op[4]!=='$'?dir(refs(op[4])[0]):cross(x,y);
           const T=[x.map(c=>c*sc),y.map(c=>c*sc),z.map(c=>c*sc),o]; const M=mul(T,inv(org));
-          const fs=[]; refs(A(refs(map[1])[0])[3]||'').forEach(b=>{ if(ent.get(b)&&ent.get(b)[0]==='IFCFACETEDBREP') fs.push(...brepFaces(b)); }); if(fs.length) out.push({faces:fs,M}); } }); });
+          const fs=[]; refs(A(refs(map[1])[0])[3]||'').forEach(b=>{ fs.push(...itemFaces(b)); }); if(fs.length) out.push({faces:fs,M}); } }); });
     return out;
   }
   // propiedades: Reference (marca de parte)
