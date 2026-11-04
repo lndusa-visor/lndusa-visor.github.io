@@ -60,6 +60,10 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 ## PAINTING PROGRESS (AV.paintingSheet en avance-mto.js)
 - Una fila por pieza de montaje; piezas sueltas en su propia fila. Fórmulas iguales a la referencia en 30 m y 55 m.
 
+## 3D CONTROL (AV.controlSheet y AV.pieceElevations en avance-mto.js)
+- Una fila por pieza, mismo orden que PAINTING PROGRESS. Fórmulas iguales a la referencia en 30 m y 55 m; solo cambian los decimales del peso (dato).
+- ELEV = centro de la caja en Z menos lo más bajo del modelo (ft). Piezas iguales por X, Y, Z; sueltas según el orden de su ensamble padre.
+
 ## Regla: el BOM manda y las fórmulas no se tocan
 - 9798 fórmulas en 55 m y 7677 en 30 m idénticas a la referencia, salvo los troqueles de la columna Z, que agrega su paso.
 - Peso y área unitarios (H, J de BOM CONNECTION; L de TAKEOFF; G, H de PAINTING) llevan los decimales del total del BOM; se ven redondeados por el formato de celda.
@@ -73,5 +77,5 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 
 ## Siguiente
 1. Generador JS (Node + navegador) hoja por hoja, comparando celda por celda contra b30/b55.
-2. Orden: BOM CONNECTION (hecha) → TAKEOFF/MTO/CUTTING PLAN/NESTING (hechas) → VENDOR REQ/PO (hechas) → CUTTING TRACKING (hecha) → WELDING (hecha) → PAINTING (hecha) → 3D CONTROL → DAILY/WEEKLY.
+2. Orden: BOM CONNECTION (hecha) → TAKEOFF/MTO/CUTTING PLAN/NESTING (hechas) → VENDOR REQ/PO (hechas) → CUTTING TRACKING (hecha) → WELDING (hecha) → PAINTING (hecha) → 3D CONTROL (hecha) → DAILY/WEEKLY.
 3. Tablero: SCENES (partes, soldaduras, pernos, ptp, grid, info) desde el IFC.
