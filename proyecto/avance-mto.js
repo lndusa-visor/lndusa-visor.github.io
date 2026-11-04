@@ -347,5 +347,25 @@
       else Object.assign(v,{Q:fx(`IF(COUNT(N${r},AG${r})=0,"",MIN(N${r},AG${r}))`,''),R:txt('N/A'),AB:txt('N/A'),AC:fx(`IF(${BS}Z${top}<>"",${BS}Z${top},"")`,''),AE:num(0),AF:num(0),AG:fx(`IF(COUNT(AA${r},S${r})=0,"",MIN(AA${r},S${r}))`,''),AI:fx(`IF(ISNUMBER(AG${r}),AG${r},"")`,'')});
       S(r,'15',PS,v); });
     return {rows,lastCol:'AK',filter:`$A$19:$AK$${z}`,subst:[[/<autoFilter ref="[^"]*">/,`<autoFilter ref="A19:AK${z}">`],[/sqref="[^"]*"/g,m=>m.replace(/([A-Z]+20:[A-Z]+)\d+/g,`$1${z}`)]],miss}; };
+
+  /* ---- DAILY REPORT, WEEKLY NOTES, WEEKLY CUT-OFFS y CONNECTION SUMMARY: se conservan de la plantilla tal cual.
+     Solo se reapuntan las filas finales de otras hojas y los textos que nombran datos del proyecto. ---- */
+  const xmlEsc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  function retarget(x,T,N){ const q=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), bo=`(?:'|&apos;)${q(T.bomSheet)}(?:'|&apos;)!`, sh=(name)=>new RegExp(`((?:'|&apos;)${q(name)}(?:'|&apos;)!(?:\\$?[A-Z]+\\$?\\d+:)?\\$?[A-Z]+\\$?)(\\d+)\\b`,'g');
+    return x.replace(/<f([^>]*)>([^<]*)<\/f>/g,(m,attr,f)=>{ let t=f; t=t.replace(new RegExp(`(${bo}\\$?[A-Z]+\\$?\\d+:\\$?[A-Z]+\\$?)${T.bomLast}\\b`,'g'),`$1${N.bomLast}`).replace(new RegExp(`(${bo}\\$?[A-Z]+\\$?)${T.bomTot}\\b`,'g'),`$1${N.bomTot}`);
+      t=t.split(`&apos;${T.bomSheet}&apos;`).join(`&apos;${N.bomSheet}&apos;`).split(`'${T.bomSheet}'`).join(`'${N.bomSheet}'`);
+      t=t.replace(sh('3D CONTROL'),(a,b,c)=>b+(+c===T.ctlLast?N.ctlLast:c)).replace(sh('WELDING PROGRESS'),(a,b,c)=>b+(+c===T.wTot?N.wTot:c)); return `<f${attr}>${t}</f>`; }).replace(/(<c r="[A-Z]+\d+"[^>]*>)(<f[^>]*>[^<]*<\/f>)<v>[^<]*<\/v>/g,(m,c,f)=>c.replace(/ t="(?:n|str|b|e)"/,'')+f); }  // sin valor guardado: Excel los calcula al abrir
+  function setCell(x,ref,val){ const re=new RegExp(`<c r="${ref}"([^>]*?)(?:/>|>[\\s\\S]*?</c>)`); return x.replace(re,(m,at)=>{ const s=(at.match(/ s="\d+"/)||[''])[0]; return typeof val==='number'?`<c r="${ref}"${s}><v>${val}</v></c>`:`<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(val)}</t></is></c>`; }); }
+  const cellText=(x,ref,sst)=>{ const m=x.match(new RegExp(`<c r="${ref}"[^>]*?t="s"[^>]*><v>(\\d+)</v>`)); return m?sst[+m[1]]:''; };
+  AV.finishSheets=function(tpl,sst,T,o){ const N={bomSheet:o.bomSheet,bomLast:o.bomLast,bomTot:o.bomTotalRow,ctlLast:o.ctlLast,wTot:o.wTot}, out={daily:retarget(tpl.daily,T,N),cuts:retarget(tpl.cuts,T,N)};
+    const L=o.loose||[], top=L.slice().sort((a,b)=>b.qty-a.qty)[0], lEn=L.map(l=>`${l.mark} ×${l.qty} under ${l.asm}`).join(' · '), lEs=L.map(l=>`${l.mark} ×${l.qty} bajo ${l.asm}`).join(' · '), A=o.anchors||{}, gr=`${o.grout||0}`, gm=o.groutMark||'';
+    let n=retarget(tpl.notes,T,N); const nt=r=>cellText(n,r,sst);
+    const shop=o.shopBolt?`(${o.shopBolt})`:'', F6=nt('F6').replace(/\([^()]*\bunder\b[^()]*\)/,`(${lEn})`).replace(/\(A325N Ø[^()]*\)/,shop), G6=nt('G6').replace(/\([^()]*\bbajo\b[^()]*\)/,`(${lEs})`).replace(/\(A325N Ø[^()]*\)/,shop);
+    const F7=nt('F7').replace(/lists \d+ .*? adhesive anchors; the IFC has \d+ \(\d+ base plates × \d+\)/,`lists ${A.n} ${A.desc} adhesive anchors; the IFC has ${A.model} (${A.basePlates} base plates × ${A.perPlate})`), G7=nt('G7').replace(/indica \d+ anclas adhesivas .*?; el IFC tiene \d+ \(\d+ placas base × \d+\)/,`indica ${A.n} anclas adhesivas ${A.desc}; el IFC tiene ${A.model} (${A.basePlates} placas base × ${A.perPlate})`);
+    const F9=nt('F9').replace(/^\d+ grout pads \([^)]*\)/,`${gr} grout pads (${gm})`), G9=nt('G9').replace(/^\d+ placas de grout \([^)]*\)/,`${gr} placas de grout (${gm})`);
+    [['E6',top?top.asm:''],['F6',F6],['G6',G6],['F7',F7],['G7',G7],['F9',F9],['G9',G9]].forEach(([r,v])=>{ n=setCell(n,r,v); }); out.notes=n;
+    let c=retarget(tpl.summary,T,N); const ct=r=>cellText(c,r,sst), A16=ct('A16').replace(/\([^()]*\bunder\b[^()]*?, shop bolted/,`(${lEn}, shop bolted`), bd=o.boltDoc;
+    [['A1',`SUMMARY – CONNECTION TYPE (${o.proj})`],['E12',`Bolt Summary ${bd} – SHOP BOLT`],['E13',`Bolt Summary ${bd} – FIELD BOLT`],['A14',`Adhesive anchors ${A.desc}`],['C14',A.model],['E14',`IFC ${A.model} (${A.basePlates} base plates × ${A.perPlate}) · Bolt Summary ${A.n}`],['A16',A16]].forEach(([r,v])=>{ c=setCell(c,r,v); }); out.summary=c; return out; };
+  AV.looseList=M=>{ const o=[]; M.forEach(x=>(x.lp||[]).forEach(l=>o.push({mark:l.mark,qty:l.qty,asm:x.mark}))); return o; };
   AV._rd=rd; AV._g6=g6; AV._ftIn=ftIn;
 })(typeof window!=='undefined'?window:globalThis);

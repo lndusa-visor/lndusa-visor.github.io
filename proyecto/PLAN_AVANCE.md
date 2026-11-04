@@ -64,6 +64,9 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 - Una fila por pieza, mismo orden que PAINTING PROGRESS. Fórmulas iguales a la referencia en 30 m y 55 m; solo cambian los decimales del peso (dato).
 - ELEV = centro de la caja en Z menos lo más bajo del modelo (ft). Piezas iguales por X, Y, Z; sueltas según el orden de su ensamble padre.
 
+## DAILY REPORT, WEEKLY NOTES, WEEKLY CUT-OFFS, CONNECTION SUMMARY (AV.finishSheets)
+- Se conservan de la plantilla; solo se reapuntan filas finales de otras hojas y textos del proyecto. Los resultados se calculan al abrir.
+
 ## Regla: el BOM manda y las fórmulas no se tocan
 - 9798 fórmulas en 55 m y 7677 en 30 m idénticas a la referencia, salvo los troqueles de la columna Z, que agrega su paso.
 - Peso y área unitarios (H, J de BOM CONNECTION; L de TAKEOFF; G, H de PAINTING) llevan los decimales del total del BOM; se ven redondeados por el formato de celda.
