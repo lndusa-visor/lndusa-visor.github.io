@@ -35,7 +35,7 @@ PANEL = r"""<div id="np-box" style="display:none;position:fixed;inset:0;z-index:
 (function(){ const L=(es,en)=>LANG==='es'?es:en, $=id=>document.getElementById(id), fill=()=>{ const gp=$('grpsel'), gb=$('grpbox'), nw=$('h-newt'), gl=$('grplb'); if(nw) nw.textContent=L('Nuevo proyecto','New project'); if(gl) gl.textContent=L('Contrato','Contract'); if(!gp) return; gp.innerHTML=TB.list.map(p=>`<option value="${String(p.code).replace(/"/g,'&quot;')}">${p.code}</option>`).join(''); gp.value=TB.cur.code; gb.hidden=TB.list.length<2; };
   const lists=()=>fetch(TB.base+'index.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{ if(!j) return; const seen=new Set(TB.list.map(p=>p.code)); (j.proyectos||[]).forEach(p=>{ if(!seen.has(p.code)){ TB.list.push({code:p.code}); seen.add(p.code); } }); fill(); }).catch(()=>{});
   $('grpsel').onchange=e=>{ location.href=location.pathname+'?g='+encodeURIComponent(e.target.value); };
-  const box=$('np-box'); $('h-new').onclick=()=>{ const f=$('np-frame'); if(!f.src) f.src='https://lndusa-visor.github.io/proyecto/'; box.style.display='grid'; }; $('np-close').onclick=()=>{ box.style.display='none'; lists(); };
+  const box=$('np-box'); $('h-new').onclick=()=>{ const f=$('np-frame'); if(!f.src) f.src='https://lndusa-visor.github.io/proyecto/?v='+Date.now(); box.style.display='grid'; }; $('np-close').onclick=()=>{ box.style.display='none'; lists(); };
   $('np-title').textContent='Nuevo proyecto'; fill(); ['lang-en','lang-es'].forEach(i=>{ const b=$(i); if(b) b.addEventListener('click',()=>setTimeout(fill,0)); }); lists(); })();
 </script>"""
 if EMBED:
