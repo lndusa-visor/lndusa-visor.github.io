@@ -309,7 +309,7 @@
      Orden de piezas iguales: por X, Y, Z; las partes sueltas siguen el orden de su ensamble padre. */
   AV.pieceElevations=function(G,M){ const I=G.instances||[], box=new Map(); let base=Infinity;
     I.forEach((x,i)=>{ const F=AV._faces(G,x.mark,x.W); let mn=[1e12,1e12,1e12],mx=[-1e12,-1e12,-1e12]; F.forEach(f=>f.pts.forEach(p=>{ for(let k=0;k<3;k++){ if(p[k]<mn[k]) mn[k]=p[k]; if(p[k]>mx[k]) mx[k]=p[k]; } })); if(mn[0]>1e11) return; box.set(i,{x,c:[0,1,2].map(k=>(mn[k]+mx[k])/2)}); if(mn[2]<base) base=mn[2]; });
-    const key=b=>[Math.round(b.c[0]),Math.round(b.c[1]),Math.round(b.c[2])], cmp=(a,b)=>{ const p=key(a),q=key(b); return p[0]-q[0]||p[1]-q[1]||p[2]-q[2]; }, H=b=>rd((b.c[2]-base)/304.8,2), byMark=new Map();
+    const key=b=>[Math.round(b.c[0]),Math.round(b.c[1]),Math.round(b.c[2])], cmp=(a,b)=>{ const p=key(a),q=key(b); return p[0]-q[0]||q[1]-p[1]||p[2]-q[2]; }, H=b=>rd((b.c[2]-base)/304.8,2), byMark=new Map();
     box.forEach(b=>{ const m=b.x.mark; if(!byMark.has(m)) byMark.set(m,[]); byMark.get(m).push(b); }); byMark.forEach(l=>l.sort(cmp));
     const out={}, get=m=>byMark.get(m)||[]; M.forEach(x=>{ const mains=get(x.mark); out[x.mark]=mains.map(H); (x.lp||[]).forEach(l=>{ const list=[]; mains.forEach(h=>{ get(l.mark).filter(b=>b.x.asmHost===h.x.asmHost).forEach(b=>list.push(H(b))); }); out[`${x.mark}>${l.mark}`]=list; }); });
     return out; };

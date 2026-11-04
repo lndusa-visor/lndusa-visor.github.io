@@ -9,7 +9,8 @@
   // W = [ejeX, ejeY, ejeZ, origen] (filas) → punto en el sistema de la pieza
   const tf=(W,v)=>[W[0][0]*v[0]+W[1][0]*v[1]+W[2][0]*v[2]+W[3][0],W[0][1]*v[0]+W[1][1]*v[1]+W[2][1]*v[2]+W[3][1],W[0][2]*v[0]+W[1][2]*v[1]+W[2][2]*v[2]+W[3][2]];
   const inv=M=>{ const [X,Y,Z,O]=M; return [[X[0],Y[0],Z[0]],[X[1],Y[1],Z[1]],[X[2],Y[2],Z[2]],[-dot(X,O),-dot(Y,O),-dot(Z,O)]]; };
-  function facesOf(geo,mark,W){ const p=geo.get(mark); if(!p||!p.faces) return []; return p.faces.map(f=>f.map(v=>tf(W,v))).filter(f=>f.length>=3).map(f=>{ let n=[0,0,0]; for(let i=0;i<f.length;i++){ const a=f[i],b=f[(i+1)%f.length]; n=add(n,cross(a,b)); } return {pts:f,n:nrm(n),d:dot(nrm(n),f[0])}; }); }
+  function facesOf(geo,mark,W){ const p=geo.get(mark); if(!p||!p.faces) return []; return polyFaces(p.faces,W); }
+  function polyFaces(P,W){ return P.map(f=>f.map(v=>tf(W,v))).filter(f=>f.length>=3).map(f=>{ let n=[0,0,0]; for(let i=0;i<f.length;i++){ const a=f[i],b=f[(i+1)%f.length]; n=add(n,cross(a,b)); } return {pts:f,n:nrm(n),d:dot(nrm(n),f[0])}; }); }
   // recorte de un polígono por otro convexo (Sutherland–Hodgman) en 2D
   function clip(subject,clipper){ let out=subject; const area=P=>P.reduce((s,p,i)=>{ const q=P[(i+1)%P.length]; return s+p[0]*q[1]-q[0]*p[1]; },0); const C=area(clipper)<0?clipper.slice().reverse():clipper;
     for(let i=0;i<C.length&&out.length;i++){ const a=C[i], b=C[(i+1)%C.length], inside=p=>(b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0])>=-1e-6; const inp=out; out=[];
@@ -20,7 +21,7 @@
   const convex=P=>{ let s=0; for(let i=0;i<P.length;i++){ const a=P[i],b=P[(i+1)%P.length],c=P[(i+2)%P.length]; const z=(b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0]); if(Math.abs(z)<1e-9) continue; if(!s) s=Math.sign(z); else if(Math.sign(z)!==s) return false; } return true; };
   // pulgadas de soldadura entre dos partes: bordes de las zonas de contacto (caras paralelas opuestas que se tocan); se ignoran los bordes cortos (espesores)
   let cwN=0; // cordones contados (No. WELDS)
-  function contactWeld(FA,FB,tolMM){ tolMM=tolMM||0.8; let L=0;
+  function contactWeld(FA,FB,tolMM,seg){ tolMM=tolMM||0.8; let L=0;
     for(const a of FA) for(const b of FB){ if(Math.abs(dot(a.n,b.n))<0.999) continue; if(Math.abs(dot(a.n,b.pts[0])-a.d)>tolMM) continue;
       const u=nrm(sub(a.pts[1],a.pts[0])), v=cross(a.n,u), to2=p=>[dot(p,u),dot(p,v)];
       const pa=a.pts.map(to2), pb=b.pts.map(to2); let poly=null;
@@ -30,8 +31,10 @@
       if(AV.dbg) AV.dbg.push(E.map(e=>+(e/MM).toFixed(3)));
       // franja delgada (canto de placa contra una cara): solo los dos lados largos; perfil o traslape: todo el contorno salvo puntas de ≤ 1/4"
       const R=E.filter(e=>e>0.5); if(R.length<3) continue; const thin=R.length===4&&Math.min(...R)<=25.4&&Math.max(...R)>Math.min(...R)+1;
-      if(thin){ const mn=Math.min(...R); for(const e of R) if(e>mn+0.5){ L+=e; cwN++; } } else for(const e of R) if(e>6.6){ L+=e; cwN++; } }
+      const mark=e=>{ if(!seg) return; const i=E.indexOf(e); E[i]=-1; const w=m=>add(add([u[0]*m[0],u[1]*m[0],u[2]*m[0]],[v[0]*m[1],v[1]*m[1],v[2]*m[1]]),[a.n[0]*a.d,a.n[1]*a.d,a.n[2]*a.d]); seg.push({a:w(poly[i]),b:w(poly[(i+1)%poly.length]),L:e/MM}); };   // cordón en 3D (solo para el tablero)
+      if(thin){ const mn=Math.min(...R); for(const e of R) if(e>mn+0.5){ L+=e; cwN++; mark(e); } } else for(const e of R) if(e>6.6){ L+=e; cwN++; mark(e); } }
     return L/MM; }
+  AV._polyFaces=polyFaces; AV._contact=contactWeld; AV._tf=tf; AV._inv=inv;
   // pernos que cruzan una parte (segmento del eje contra la caja de la parte en sus coordenadas)
   function crosses(B,p,W,tol){ tol=tol==null?1:tol; const Wi=inv(W), pa=tf(Wi,B.a), pb=tf(Wi,B.b), dv=sub(pb,pa); let t0=0,t1=1;
     for(let j=0;j<3;j++){ if(Math.abs(dv[j])<1e-9){ if(pa[j]<p.mn[j]-tol||pa[j]>p.mx[j]+tol) return false; continue; } let u=(p.mn[j]-tol-pa[j])/dv[j], w=(p.mx[j]+tol-pa[j])/dv[j]; if(u>w) [u,w]=[w,u]; t0=Math.max(t0,u); t1=Math.min(t1,w); } return t0<=t1; }

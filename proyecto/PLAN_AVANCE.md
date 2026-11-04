@@ -84,14 +84,21 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 - Solo cambian: decimales de peso/área del BOM, regla de soldadura aceptada, nota de pernos del 30 m, 8 pesos de 0.1 lb.
 - bolts.list y P.units[].meta guardan los datos de cada unidad.
 
+## Tablero para proyectos nuevos (proyecto/tablero.html + avance-scene.js)
+- tablero.html se arma con tools/tablero_build.py desde el HTML con PR SAP; el original no se toca y la copia no lleva proyectos adentro.
+- Lee ../tablero-datos/index.json, <carpeta>/proyecto.json y <carpeta>/<unidad>.json. Carpeta aparte del visor porque «Publicar visor» reescribe la carpeta del código.
+- AV.scene (una unidad), AV.sceneBundle (proyecto) y AV.publishTablero (botón «Publicar en el tablero» de index.html, sube a main).
+- Ejes: escena = (x, z, −y) en pies; origen en la caja de todas las piezas. Rejilla: la de menor elevación, altura fija 0.082.
+- 3D ID: orden del BOM; piezas iguales por (x, z, y) de la escena, sueltas dentro de su padre con la misma regla, referencias al final. Igual regla en AV.pieceElevations.
+- Dueño del perno: el ensamble que lo agrega en el IFC. Las filas salen del modelo, no de un Point-to-Point.
+- Comparado contra SCENES.w55 y SCENES.w30: 584 + 331 IDs iguales, 1096 + 633 partes con los mismos vértices (±0.0025 ft), todos los pernos, bai, J, bsum, bx, grid y pdesc iguales; ptp de 55 m idéntico.
+- Diferencias aceptadas: soldadura de B6/B7/B9 y VB2, los 8 pesos de 0.1 lb del 30 m. En 30 m las filas de pernos no llevan el «×N» del Point-to-Point y las anclas nombran el grout.
+- Paneles del tablero comparados contra el original (con three.js simulado): iguales, salvo esos textos. Excel generado: 3D CONTROL con 0 filas distintas y cada ID cae en su marca y pieza.
+- Sin probar con three.js ni SheetJS reales: la red de esa sesión los bloqueó. Falta ver el 3D en un navegador real.
+
 ## Control de pruebas
 - Los troqueles de la columna Z de BOM CONNECTION no los pone el generador: los agrega el paso «Agregar al Excel de avance». Falta encadenarlo.
 
 ## Siguiente
-1. Tablero para proyectos nuevos, en una copia (proyecto/tablero.html) del Weld Map con PR SAP; el original no se toca.
-   - El tablero fija proyectos en SCENES, PROJS, PKEYS, en la validación de PROJ y en readExcel (nombre exacto de la hoja BOM).
-   - Falta AV.scene: construir desde el IFC la escena (A, info, parts, welds, bolts, btype, bai, bown, ptp, bsum, bx, grid, pdesc, K, J) y compararla con SCENES.w55 y SCENES.w30.
-   - El 3D ID de A debe seguir el orden de 3D CONTROL. Scene guardada en GitHub por proyecto, como los visores; se agrega al selector de unidades y a la vista sumada.
-   - Abrir «Nuevo proyecto» desde el tablero con las opciones de carga, sin alterar sus pestañas.
-2. Decidir el cronograma de WEEKLY NOTES.
-3. Prueba final en Excel real y publicar en main.
+1. Decidir el cronograma de WEEKLY NOTES.
+2. Prueba en Excel real y en navegador real, y publicar en main.
