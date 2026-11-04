@@ -192,5 +192,19 @@
       pr.push({r:x,ht:'15',ch:false,cells:cells('A34 B113 C113 D113 E125 F125 G21 H125 I21 J37 K126 L37 M126 N37 O127 P100 Q75',{B:look('B'),C:look('C'),D:look('D'),E:look('E'),F:look('N'),H:look('O'),P:fx(`IF($A${x}="","",IFERROR(INDEX(${vr('I')},${m(x)}),""))`,''),Q:fx(`IF(OR($A${x}="",K${x}=""),"",IFERROR(K${x}/INDEX(${vr('I')},${m(x)})*INDEX(${vr('J')},${m(x)}),""))`,'')})}); }
     const itemRows=rows.filter(R=>R.cells.some(c=>c.c==='U')&&R.r>9).map(R=>R.r), dv=AV.ranges('L',itemRows).join(' ');
     return {vendor:{rows,lastCol:'U',merges,subst:[[/(<dataValidation [^>]*?sqref=")[^"]*(")/,`$1${dv}$2`]]},po:{rows:pr,lastCol:'Q'},mats,itemCount:item}; };
+
+  /* pernos para las hojas de material, desde lo que ya leyó la página del Bolt Summary */
+  AV.boltInput=function(B,model){ const out={bolts:[],nuts:0,washers:0,anchors:null,boltDia:'3/4"'}; if(!B||!B.rows) return out; const m=new Map();
+    const lenTxt=l=>{ const w=Math.floor(l+1e-9), r=Math.round((l-w)*16); if(!r) return `${w}"`; let n=r,d=16; while(n%2===0){ n/=2; d/=2; } return `${w?w+' ':''}${n}/${d}"`; };
+    B.rows.forEach(b=>{ if(b.sec==='Nuts'){ out.nuts+=b.qty; return; } if(b.sec==='Washers'){ out.washers+=b.qty; return; } if(b.sec!=='Field'&&b.sec!=='Shop') return;
+      const dia=String(b.dia||'').replace(/"/g,''); if(/HILTI|ANCHOR/i.test(b.grade)){ const d=`${String(b.grade).replace(/\s+$/,'')} Ø${dia}" x ${lenTxt(b.len)}`; out.anchors={desc:d,n:(out.anchors?out.anchors.n:0)+b.qty}; return; }
+      const k=dia+'|'+b.len+'|'+b.grade; if(!m.has(k)) m.set(k,{dia,len:b.len,grade:b.grade,field:0,shop:0}); const x=m.get(k); if(b.sec==='Field') x.field+=b.qty; else x.shop+=b.qty; });
+    out.bolts=[...m.values()].sort((a,b)=>a.len-b.len).map(x=>({desc:`Ø${x.dia}" x ${lenTxt(x.len)} heavy hex`,grade:x.grade,field:x.field,shop:x.shop})); if(m.size) out.boltDia=[...m.values()][0].dia+'"';
+    if(out.anchors&&model) Object.assign(out.anchors,model); const t=(B.meta&&B.meta.title||'').match(/[A-Z0-9-]*BOM-\d+/); out.boltDocFull=t?t[0]:''; out.boltDoc=(out.boltDocFull.match(/BOM-\d+/)||[''])[0]; return out; };
+
+  AV.shopBoltText=B=>{ const x=(B&&B.bolts||[]).find(y=>y.shop>0); return x?`${x.grade} ${String(x.desc).replace(/ heavy hex$/,'')}`:null; };
+  // anclajes del modelo 3D: se suman de la columna Q de la hoja BOM («Anchored … ×4» por pieza)
+  AV.anchorModel=function(S){ let pl=0,tot=0,per=null,mixed=false; S.rows.forEach(R=>{ const c={}; R.cells.forEach(x=>c[x.c]=x); const t=c.AP&&c.AP.v; if(t!=='A') return; const m=String(c.Q&&c.Q.v||'').match(/anchored [^×]*×(\d+)/i); if(!m) return; const q=+c.D.v, n=+m[1]; pl+=q; tot+=q*n; if(per==null) per=n; else if(per!==n) mixed=true; });
+    return tot?{model:tot,basePlates:mixed?null:pl,perPlate:mixed?null:per}:null; };
   AV._rd=rd; AV._g6=g6; AV._ftIn=ftIn;
 })(typeof window!=='undefined'?window:globalThis);

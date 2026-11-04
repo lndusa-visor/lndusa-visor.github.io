@@ -38,14 +38,17 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 ## TAKEOFF BASE, MTO SUMMARY, PROFILE CUTTING PLAN, PLATE NESTING (proyecto/avance-mto.js)
 - AV.mtoParts lee las filas P/H de la hoja BOM; AV.mtoSheets arma las 4 hojas. Estilos fijos en el código (mismos índices de styles.xml).
 - Comparación contra el Excel de 55 m: 0 diferencias en valor, fórmula, resultado guardado, estilo y alto de fila (3216 celdas). Recalculado en LibreOffice: 0 diferencias, 0 errores.
-- Probado leyendo la BOM del Excel de 55 m. Falta probar: con la BOM generada (AV.bomSheet) y con el de 30 m.
-- Corte: first-fit por largo descendente (empates en orden del BOM); kerf por corte, recorte al final; barras iguales juntas, primero las más repetidas. Usado = redondeo a 3 decimales con empate al par; largos con 6 cifras significativas.
-- Placas: área descendente, Best Short Side Fit, primera lámina donde quepa, lámina útil = lámina − bordes + separación, sin reordenar láminas. Ojo: difiere del nest() de index.html (mismo número de láminas en 55 m, otro acomodo).
-- Entran como opciones, no se deducen: largo de barra por perfil (stock) y tamaño de lámina (los elige el HTML); pernos, tuercas, arandelas y anclajes (del Bolt Summary, falta conectarlo); columna de repuesto (VENDOR REQUISITION C7).
+- Probado de punta a punta en 30 m y 55 m: página real con BOM + IFC + Bolt Summary → AV.model → AV.bomSheet → AV.mtoParts → hojas. 0 diferencias en las 6 hojas.
+- Corte: largo descendente (empates en orden del BOM), cada pieza a la barra más justa; kerf por corte, recorte al final; barras iguales juntas, primero las más repetidas. Dentro de la barra: largo descendente y marca como texto. Usado = redondeo a 3 decimales con empate al par; largos con 6 cifras significativas.
+- Placas (misma marca con dos largos = piezas distintas): área descendente, Best Short Side Fit, primera lámina donde quepa, lámina útil = lámina − bordes + separación, sin reordenar láminas. Ojo: difiere del nest() de index.html (mismo número de láminas en 55 m, otro acomodo).
+- Entran como opciones, no se deducen: largo de barra por perfil (stock) y tamaño de lámina (los elige el HTML); % de repuesto (VENDOR REQUISITION C7). Pernos y anclajes: AV.boltInput lee lo que la página ya leyó del Bolt Summary; AV.anchorModel y AV.shopBoltText completan notas.
 
 ## VENDOR REQUISITION y PURCHASE ORDERS (AV.vendorSheets en avance-mto.js)
 - Mismo diseño y fórmulas; solo cambian los datos del proyecto. PURCHASE ORDERS sale sin órdenes. Comparadas contra 55 m.
-- AV.vendorSheets devuelve mats (clave de material → fila), que necesitará 3D CONTROL. Falta probar con la BOM generada y con 30 m.
+- AV.vendorSheets devuelve mats (clave de material → fila), que necesitará 3D CONTROL. Probadas también de punta a punta.
+
+## Control de pruebas
+- Los troqueles de la columna Z de BOM CONNECTION no los pone el generador: los agrega el paso «Agregar al Excel de avance». Falta encadenarlo.
 
 ## Siguiente
 1. Generador JS (Node + navegador) hoja por hoja, comparando celda por celda contra b30/b55.
