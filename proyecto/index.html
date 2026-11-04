@@ -2591,13 +2591,13 @@ function buildBook(P,opt){
   // 7. Lista de troquelados: UNA sola hoja. Arriba el resumen (por unidad y material) y hacia abajo un bloque por unidad y material,
   //    cada uno con su título, encabezado y TOTAL (al imprimir, cada bloque empieza en hoja nueva).
   //    Troquel automático: letra (casilla «Letra del troquel») + número consecutivo en todo el proyecto, siguiendo de una unidad a otra.
-  //    Ángulos, shim plates, arandelas y shear plates: un solo troquel = nombre de la marca (A1, LA1…), una fila con la cantidad y un QR.
+  //    Piezas sueltas y pequeñas (ángulos, shim plates, arandelas, shear plates, plaquitas que van solas): un solo troquel = nombre de la marca (A1, LA1…), una fila con la cantidad y un QR.
   //    Lo demás: mismo troquel para las piezas repetidas, pero una fila y un QR por pieza («1 de 4», «2 de 4»…).
   //    Las partes que el IFC muestra apernadas a su ensamble (p. ej. clip angles) salen como piezas sueltas; su peso se descuenta del ensamble.
   const U={}, TQS=[]; let tqMain=0;
   const tqSort=(a,b)=>markKey(a.mark).p.localeCompare(markKey(b.mark).p)||markKey(a.mark).n-markKey(b.mark).n||natCmp(a.mark,b.mark);
   const LET=String(opt.stLetter||'C').toUpperCase().replace(/[^A-Z]/g,'').slice(0,3)||'C';
-  const SMALL_RE=/CLIP|SHIM|WASHER|ARANDELA|SHEAR/i;
+  const SMALL_RE=/CLIP|SHIM|WASHER|ARANDELA|SHEAR/i, SMALL_ANGLE_FT=1;   // ángulo suelto de hasta 1 ft = pieza pequeña
   const boltedOf=new Map();   // marca de ensamble → Set de partes apernadas (IFC)
   const boltSet=am=>{ const k=normMark(am); if(!boltedOf.has(k)){ const W=typeof ifcWeld==='function'?ifcWeld(am):null; boltedOf.set(k,new Set(W&&W.b?W.b.map(normMark):[])); } return boltedOf.get(k); };
   // solo ángulos y placas apernados salen sueltos (clip angles, shims, arandelas…); un perfil W/HSS/C apernado viaja con su ensamble
@@ -2615,7 +2615,7 @@ function buildBook(P,opt){
       let w1=main?(num(A.pwt)!==null?A.pwt:(num(A.twt)!==null&&r.asm.qty?A.twt/r.asm.qty:null)):num(r.pwt);
       // al ensamble se le quitan sus partes apernadas (salen en su propia línea)
       if(main&&r.asm){ const bs=boltSet(r.asm.mark); if(bs.size) r.asm.parts.forEach(p=>{ if(p!==r&&isBoltedPart(p)){ const per=(p.qty||0)/(r.asm.qty||1); if(w1!==null) w1-=(Number(p.pwt)||0)*per; if(s1!==null) s1-=(Number(p.sa1)||0)*per; } }); }
-      const tipo=tipoOf(r), small=SMALL_RE.test(tipo||'')||(!main&&SMALL_RE.test(String(r.desc||'')));
+      const tipo=tipoOf(r), small=(!main&&(r.kind==='plate'||(Number(r.len)||0)<=SMALL_ANGLE_FT))||SMALL_RE.test(tipo||'')||(r.kind==='plate'&&r.asm&&r.asm.parts.length<=1);  // placas sueltas y ángulos pequeños: troquel = su marca; los ángulos largos llevan troquel numerado
       const un=main?unionOf(r.asm.mark,r.mark,c):'Apernada';
       return {r,main,c,am,mark:r.mark,sno:r.sno,qty:r.qty||0,desc:descOf(r),tipo,grade:r.grade,len:r.len,w1:w1===null?null:Math.max(0,w1),s1:s1===null?null:Math.max(0,s1),pic,unit,small,un}; };
     mains.filter(r=>cls(r.asm)!=='Compuesta').sort(tqSort).forEach(r=>out.push(line(r,true)));
