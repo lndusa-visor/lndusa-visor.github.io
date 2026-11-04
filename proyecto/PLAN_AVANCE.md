@@ -75,6 +75,9 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 ## Decisión sobre soldadura
 - El usuario decidió dejar la regla como está: no se ajusta por B6/B7/B9 ni VB2. Esas diferencias contra la referencia quedan aceptadas.
 
+## Recálculo real
+- Para probar, se quitan todos los resultados guardados de las fórmulas antes de abrir en LibreOffice; si no, conserva los guardados. 15 hojas, 0 errores en 30 m y 55 m.
+
 ## Control de pruebas
 - Los troqueles de la columna Z de BOM CONNECTION no los pone el generador: los agrega el paso «Agregar al Excel de avance». Falta encadenarlo.
 

@@ -150,7 +150,7 @@
         AQ:{v:w},AR:{f:`IF(N(AQ${r})=0,"",AQ${r}*IFERROR(MIN(1,N(V${r})/D${r}),0))`,v:w?0:''},AS:{f:`IF(N(AQ${r})=0,"",AQ${r}-AR${r})`,v:w?w:''},AT:{v:p.fillet}},weldF())); });
       hp.forEach(p=>{ R1.push(r); const li=p.li||{shop:0,field:0,to:[]}; const q=p.r;
         add('H',Object.assign(base(p),{L:{v:'LOOSE'},M:{v:'NO'},N:{v:'—'},O:{v:`LOOSE piece – not welded, fabricated and shipped as an individual piece · shop bolted to ${a.mark} (${spec.grade} Ø${spec.dia} ×${li.shop})`},P:{v:'—'},
-          Q:{v:bTxt(li.field,li.to)},AC:{f:`SUM(I${r}:I${r})`,v:W(q.qty*q.pwt)},AD:{f:`SUM(AA${r}:AA${r})`,v:0},AE:{f:`SUM(AB${r}:AB${r})`,v:0},AF:{f:`IFERROR(AD${r}/AC${r},0)`,v:0},AG:{f:`IFERROR(AE${r}/AC${r},0)`,v:0},
+          Q:{v:bTxt(li.field,li.to)},AC:{f:`SUM(I${r}:I${r})`,v:W(rowT(q))},AD:{f:`SUM(AA${r}:AA${r})`,v:0},AE:{f:`SUM(AB${r}:AB${r})`,v:0},AF:{f:`IFERROR(AD${r}/AC${r},0)`,v:0},AG:{f:`IFERROR(AE${r}/AC${r},0)`,v:0},
           AH:{f:`'DAILY REPORT'!$C$5*AF${r}+'DAILY REPORT'!$C$6*AG${r}`,v:0},AI:{f:`ROUNDDOWN(D${r}*MIN(AF${r},AG${r})+0.0001,0)`,v:0},AJ:{f:`IFERROR(AD${r}/$I$@TOT@,0)`,v:0},AK:{f:`IFERROR(AE${r}/$I$@TOT@,0)`,v:0},
           AL:{f:`'DAILY REPORT'!$C$5*AJ${r}`,v:0},AM:{f:`'DAILY REPORT'!$C$6*AK${r}`,v:0},AN:{f:`AL${r}+AM${r}`,v:0},AO:{v:'LOOSE'},AP:{v:'H'}},na())); });
       groups.push({rA,p0,plP,pl,comp:x.comp,loose:hp.length});
