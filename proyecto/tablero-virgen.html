@@ -970,7 +970,7 @@ async function readExcel(file){
       if(ph>=0) for(let i=ph+1;i<pr_.length;i++){ const r = pr_[i]; if(!r || r[0]==null || r[0]==='' ) continue; if(!r[6] && !r[8] && !r[10]) continue;
         mat.po.push({it:r[0], v:sv(r[6]), pr:sv(r[7]), po:sv(r[8]), pd:toSerial(r[9]), q:+r[10]||0, prm:toSerial(r[11]), qr:+r[12]||0, dr:toSerial(r[13]), rk:sv(r[14])}); } }
     if(!mat.rows.length) mat = null; }
-  const proj = PKEYS.find(k=>wb.SheetNames.includes(PROJS[k].sheet)) || null;
+  const proj = (m => m.length===1 ? m[0] : null)(PKEYS.filter(k=>wb.SheetNames.includes(PROJS[k].sheet)));   // misma hoja en varias unidades (un BOM dividido): manda la unidad abierta
   const sum = wbSum(X, wb, file.name);
   return {proj, sum, src:'excel', file:file.name, at:new Date().toISOString(), cortes, f, wts: wts || WTS0, ar, p: Object.keys(p).length ? p : null, x: Object.keys(x).length ? x : null, cut, fw, pd: today, notes, mat, wi: Object.keys(wi).length ? wi : null};
 }

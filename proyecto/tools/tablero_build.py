@@ -68,7 +68,7 @@ if EMBED or VIRGEN:
     R("I18N[l].title = 'US.068.4 - PDC Piperacks · WTS 55 m & WWTP 30 m'; Object.assign", "I18N[l].title = TB.title; Object.assign")
     R("Object.assign(I18N.en, {sumH1:'US.068.4 - PDC Piperacks · WTS 55 m & WWTP 30 m', pSel:'Project', pAll:'Summary · 2 projects', sumTitle:'Summary of the 2 projects',", "Object.assign(I18N.en, {sumH1:TB.title, pSel:'Project', pAll:`Summary · ${PKEYS.length} projects`, sumTitle:`Summary of the ${PKEYS.length} projects`,")
     R("Object.assign(I18N.es, {sumH1:'US.068.4 - PDC Piperacks · WTS 55 m & WWTP 30 m', pSel:'Proyecto', pAll:'Resumen · 2 proyectos', sumTitle:'Resumen de los 2 proyectos',", "Object.assign(I18N.es, {sumH1:TB.title, pSel:'Proyecto', pAll:`Resumen · ${PKEYS.length} proyectos`, sumTitle:`Resumen de los ${PKEYS.length} proyectos`,")
-    R("const proj = wb.SheetNames.includes('BOM WTS-55M - CONNECTION') ? 'w55' : wb.SheetNames.includes('BOM WWTP-30M - CONNECTION') ? 'w30' : null;", "const proj = PKEYS.find(k=>wb.SheetNames.includes(PROJS[k].sheet)) || null;")
+    R("const proj = wb.SheetNames.includes('BOM WTS-55M - CONNECTION') ? 'w55' : wb.SheetNames.includes('BOM WWTP-30M - CONNECTION') ? 'w30' : null;", "const proj = (m => m.length===1 ? m[0] : null)(PKEYS.filter(k=>wb.SheetNames.includes(PROJS[k].sheet)));   // misma hoja en varias unidades (un BOM dividido): manda la unidad abierta")
     R("const markKey = s => { const m = String(s||'').toUpperCase().match(/(?:WTS|WWTP)-[A-Z0-9]+/);", "const markKey = s => { const m = String(s||'').toUpperCase().match(/[A-Z0-9]+[-_][A-Z0-9]+/);")
     R('<div class="hrow"><label class="vsel"><span data-i="pSel"></span><select id="projsel"></select></label>',
       '<div class="hrow"><label class="vsel" id="grpbox" hidden><span id="grplb"></span><select id="grpsel"></select></label><label class="vsel"><span data-i="pSel"></span><select id="projsel"></select></label><button class="hload" id="h-new" type="button"><span>＋</span> <span id="h-newt"></span></button>')
@@ -94,7 +94,7 @@ R("Object.assign(I18N.en, {sumH1:'US.068.4 - PDC Piperacks · WTS 55 m & WWTP 30
 R("Object.assign(I18N.es, {sumH1:'US.068.4 - PDC Piperacks · WTS 55 m & WWTP 30 m', pSel:'Proyecto', pAll:'Resumen · 2 proyectos', sumTitle:'Resumen de los 2 proyectos',",
   "Object.assign(I18N.es, {sumH1:TB.title, pSel:'Unidad', pAll:`Resumen · ${PKEYS.length} unidad${PKEYS.length>1?'es':''}`, sumTitle:`Resumen de ${PKEYS.length>1?'las '+PKEYS.length+' unidades':'la unidad'}`,")
 R("const proj = wb.SheetNames.includes('BOM WTS-55M - CONNECTION') ? 'w55' : wb.SheetNames.includes('BOM WWTP-30M - CONNECTION') ? 'w30' : null;",
-  "const proj = PKEYS.find(k=>wb.SheetNames.includes(PROJS[k].sheet)) || null;")
+  "const proj = (m => m.length===1 ? m[0] : null)(PKEYS.filter(k=>wb.SheetNames.includes(PROJS[k].sheet)));   // misma hoja en varias unidades (un BOM dividido): manda la unidad abierta")
 R("const markKey = s => { const m = String(s||'').toUpperCase().match(/(?:WTS|WWTP)-[A-Z0-9]+/);", "const markKey = s => { const m = String(s||'').toUpperCase().match(/[A-Z0-9]+[-_][A-Z0-9]+/);")
 R('<div class="hrow"><label class="vsel"><span data-i="pSel"></span><select id="projsel"></select></label>',
   '<div class="hrow"><label class="vsel" id="grpbox" hidden><span id="grplb"></span><select id="grpsel"></select></label><label class="vsel"><span data-i="pSel"></span><select id="projsel"></select></label><a class="hload" id="h-new" href="index.html" target="_blank" rel="noopener" style="text-decoration:none"><span>＋</span> <span id="h-newt"></span></a>')
