@@ -19,6 +19,7 @@
     function X(P,Q,a,b){ const A1=Q[1]-P[1],B1=P[0]-Q[0],C1=A1*P[0]+B1*P[1],A2=b[1]-a[1],B2=a[0]-b[0],C2=A2*a[0]+B2*a[1],D=A1*B2-A2*B1; if(Math.abs(D)<1e-12) return Q; return [(B2*C1-B1*C2)/D,(A1*C2-A2*C1)/D]; } }
   const convex=P=>{ let s=0; for(let i=0;i<P.length;i++){ const a=P[i],b=P[(i+1)%P.length],c=P[(i+2)%P.length]; const z=(b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0]); if(Math.abs(z)<1e-9) continue; if(!s) s=Math.sign(z); else if(Math.sign(z)!==s) return false; } return true; };
   // pulgadas de soldadura entre dos partes: bordes de las zonas de contacto (caras paralelas opuestas que se tocan); se ignoran los bordes cortos (espesores)
+  let cwN=0; // cordones contados (No. WELDS)
   function contactWeld(FA,FB,tolMM){ tolMM=tolMM||0.8; let L=0;
     for(const a of FA) for(const b of FB){ if(Math.abs(dot(a.n,b.n))<0.999) continue; if(Math.abs(dot(a.n,b.pts[0])-a.d)>tolMM) continue;
       const u=nrm(sub(a.pts[1],a.pts[0])), v=cross(a.n,u), to2=p=>[dot(p,u),dot(p,v)];
@@ -29,7 +30,7 @@
       if(AV.dbg) AV.dbg.push(E.map(e=>+(e/MM).toFixed(3)));
       // franja delgada (canto de placa contra una cara): solo los dos lados largos; perfil o traslape: todo el contorno salvo puntas de ≤ 1/4"
       const R=E.filter(e=>e>0.5); if(R.length<3) continue; const thin=R.length===4&&Math.min(...R)<=25.4&&Math.max(...R)>Math.min(...R)+1;
-      if(thin){ const mn=Math.min(...R); for(const e of R) if(e>mn+0.5) L+=e; } else for(const e of R) if(e>6.6) L+=e; }
+      if(thin){ const mn=Math.min(...R); for(const e of R) if(e>mn+0.5){ L+=e; cwN++; } } else for(const e of R) if(e>6.6){ L+=e; cwN++; } }
     return L/MM; }
   // pernos que cruzan una parte (segmento del eje contra la caja de la parte en sus coordenadas)
   function crosses(B,p,W,tol){ tol=tol==null?1:tol; const Wi=inv(W), pa=tf(Wi,B.a), pb=tf(Wi,B.b), dv=sub(pb,pa); let t0=0,t1=1;
@@ -53,11 +54,11 @@
       a.parts.forEach(r=>{ const k=normMark(r.mark); if(r!==a.main&&!looseMarks.has(k)&&(welded.size||bolted.size)) welded.add(k); });
       const comp=(a.auto||'')==='Compuesta';
       // soldadura: contacto de cada parte soldada con la pieza principal (en el primer ensamble del IFC)
-      const weldIn=new Map();
+      const weldIn=new Map(), weldN=new Map(), weldSeq=[];
       if(Gm&&A){ const main=A.members.find(m=>normMark(m.mark)===normMark(W&&W.main||a.mark))||A.members[0]; const FM=facesOf(Gm,main.mark,main.W);
         // cada parte soldada: contacto con la principal; el contacto entre dos partes soldadas se le cuenta a la que va después en el ensamble del IFC
         const sec=A.members.filter(m=>m!==main&&welded.has(normMark(m.mark))), FS=sec.map(m=>facesOf(Gm,m.mark,m.W));
-        sec.forEach((m,j)=>{ let L=contactWeld(FS[j],FM); for(let i=0;i<j;i++) L+=contactWeld(FS[j],FS[i]); const k=normMark(m.mark); weldIn.set(k,(weldIn.get(k)||0)+L); }); }
+        sec.forEach((m,j)=>{ if(!weldSeq.includes(normMark(m.mark))) weldSeq.push(normMark(m.mark)); const n0=cwN; let L=contactWeld(FS[j],FM); for(let i=0;i<j;i++) L+=contactWeld(FS[j],FS[i]); const k=normMark(m.mark); weldIn.set(k,(weldIn.get(k)||0)+L); weldN.set(k,(weldN.get(k)||0)+cwN-n0); }); }
       // pernos de campo por instancia y piezas a las que se une
       const inst=(Gm&&Gm.instances||[]).filter(x=>normMark(x.asmMark||'')===normMark(a.mark));
       const hosts=[...new Set(inst.map(x=>x.asmHost))];
@@ -81,9 +82,9 @@
       const ifcOrder=A?A.members.map(m=>normMark(m.mark)):[];
       const parts=a.parts.map(r=>{ const k=normMark(r.mark); const role=ROLE[(names.get&&names.get(r.mark.toUpperCase()))||(names.get&&names.get(k))||'']||(r.kind==='plate'?'plate':/^W/i.test(r.D||'')?'welded beam stub':'part');
         const t=r.t||0; const fil=role==='base plate'&&t>=1?'5/16"':'1/4"';
-        return {r,k,main:r===a.main,welded:welded.has(k)&&r!==a.main,loose:looseMarks.has(k),role,fillet:fil,weld:weldIn.get(k)||0,li:looseInfo.get(k)||null}; });
+        return {r,k,main:r===a.main,welded:welded.has(k)&&r!==a.main,loose:looseMarks.has(k),role,fillet:fil,weld:weldIn.get(k)||0,weldN:weldN.get(k)||0,li:looseInfo.get(k)||null}; });
       const nodes=comp?(a.qty>1?`${node+1}–${node+a.qty}`:String(node+1)):'—'; if(comp) node+=a.qty;
-      out.push({a,comp,parts,nodes,perInst,anchors,to:[...to].sort(natCmp),spec:boltSpec,ifcOrder}); });
+      out.push({a,comp,parts,nodes,perInst,anchors,to:[...to].sort(natCmp),spec:boltSpec,ifcOrder,weldSeq}); });
     return out; };
 
   /* ---------- utilidades de hoja (OOXML) ---------- */

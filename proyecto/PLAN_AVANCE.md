@@ -51,10 +51,16 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 - Una línea por parte, ligada a la hoja BOM; tabla diaria fija de 120 días (filas 11–130, la usa la gráfica). 0 diferencias en 30 m y 55 m desde los archivos de origen. Fecha inicial = DAILY REPORT C7.
 - Los números de estilo cambian entre los Excel de 30 y 55: la plantilla final usará un solo styles.xml; la prueba compara la apariencia real de cada celda.
 
+## WELDING PROGRESS (AV.weldingSheet en avance-mto.js)
+- Una fila por nodo; tabla diaria fija de 120 días (filas 21–140). AV.model ahora da cordones (weldN) y orden de soldadura (weldSeq). G = suma exacta de pulgadas; F = cordones.
+- Comparada desde archivos de origen. Diferencias: F y G en las mismas piezas ya conocidas (B6 / B7, B9: 16 vs 24 y 61 vs 63; VB2: 4 vs 2 y 32.8 vs 24.8), y los totales que dependen de ellas.
+- Columna I en 8 columnas de 30 m: 0.1 lb (889.9 vs 889.8, 877.5 vs 877.4). La referencia no coincide con el BOM; fuente aún no encontrada.
+- K19, L19 y el valor de la columna L los completa el paso de troqueles.
+
 ## Control de pruebas
 - Los troqueles de la columna Z de BOM CONNECTION no los pone el generador: los agrega el paso «Agregar al Excel de avance». Falta encadenarlo.
 
 ## Siguiente
 1. Generador JS (Node + navegador) hoja por hoja, comparando celda por celda contra b30/b55.
-2. Orden: BOM CONNECTION (hecha) → TAKEOFF/MTO/CUTTING PLAN/NESTING (hechas) → VENDOR REQ/PO (hechas) → CUTTING TRACKING (hecha) → WELDING → PAINTING → 3D CONTROL → DAILY/WEEKLY.
+2. Orden: BOM CONNECTION (hecha) → TAKEOFF/MTO/CUTTING PLAN/NESTING (hechas) → VENDOR REQ/PO (hechas) → CUTTING TRACKING (hecha) → WELDING (hecha) → PAINTING → 3D CONTROL → DAILY/WEEKLY.
 3. Tablero: SCENES (partes, soldaduras, pernos, ptp, grid, info) desde el IFC.

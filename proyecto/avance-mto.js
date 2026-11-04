@@ -230,5 +230,45 @@
         AF:{f:`IF(AB${r}<=TODAY(),${QD.map(([a,b])=>`SUMPRODUCT((${rng(b)}=AB${r})*${rng(a)}*${rng('Y')}/${rng('H')})`).join('+')},"")`}});
       rows.push({r,ht:'15',ch:false,cells:cells([p?PS:'',r<=DAYS?DS:''].filter(Boolean).join(' '),v)}); }
     return {rows,lastCol:'AF',filter:`$A$10:$Z$${l}`,merges:['H4:P7'],subst:[[/<autoFilter ref="[^"]*">/,`<autoFilter ref="A10:Z${l}">`],[/sqref="[^"]*"/g,m=>m.replace(/([A-Z]+11:[A-Z]+)\d+/g,`$1${l}`)]]}; };
+
+  /* ---- WELDING PROGRESS: una fila por pieza compuesta (nodo); tabla diaria fija de 120 días (filas 21–140) ---- */
+  const elemName=t=>String(t||'').toUpperCase().replace(/_/g,' ').replace(/^VERTICAL /,'VERT. ').replace(/^HORIZONTAL /,'HORIZ. ');
+  AV.weldingSheet=function(o,M,bom){ const B={}; bom.rows.forEach(R=>{ const c={}; R.cells.forEach(x=>c[x.c]=x); const t=c.AP&&c.AP.v; if(t==='A') B[c.B.v]={r:R.r,E:c.E.v,P:[]}; else if(t==='P'){ const m=Object.values(B).pop(); m.P.push({r:R.r,mark:c.B.v,aq:c.AQ?c.AQ.v:0,at:c.AT?c.AT.v:null}); } });
+    const BS=`'${o.bomSheet}'!`, st=serial(o.startDate), N=[]; let node=0;
+    M.filter(x=>x.comp).forEach(x=>{ const b=B[x.mark], f=b.P[0].r, l=b.P[b.P.length-1].r, G=rd(x.wp.reduce((t,p)=>t+(+p.weld||0),0),1), fs=[...new Set(b.P.map(p=>p.at).filter(Boolean))].sort((a,c)=>{ const v=s=>{ const m=String(s).match(/(\d+)\/(\d+)/); return m?m[1]/m[2]:0; }; return v(a)-v(c); });
+      const seq=x.seq||[], ord=[...x.wp].sort((p,q)=>seq.indexOf(p.k)-seq.indexOf(q.k)), E=ord.map(p=>`${p.mark} ×${p.qty/x.qty} ${String(p.role).replace(/ stub$/,'')}`).join('; '), F=x.wp.reduce((t,p)=>t+p.n,0), I=rd(x.twt/x.qty-(x.loose||0)/x.qty,1);
+      for(let i=0;i<x.qty;i++) N.push({mark:x.mark,node:++node,el:elemName(b.E),E,F,G,H:fs.join(' / '),I,A:b.r,f,l,q:x.qty,i}); });
+    const n=N.length, a=21, z=20+n, T=z+1, rg=c=>`$${c}$${a}:$${c}$${z}`, sum=k=>N.reduce((t,x)=>t+x[k],0), W=sum('G'), rows=[], ALL=rg('D');
+    rows.push(noteRow(1,60,'WELDING PROGRESS TRACKING','18',true),noteRow(2,61,'One row per composite piece with shop welds (NODE). Weld count and length derived from the Tekla model (IFC contact faces); all welds are shop fillet welds.'));
+    const els=[...new Set(N.map(x=>x.el))], fills=[...new Set(N.map(x=>x.H))].sort((p,q)=>p.length-q.length), E0={BEAM:0}; 
+    const elRow=r=>{ const e=els[r-6]; if(!e) return {}; const g=N.filter(x=>x.el===e), wi=g.reduce((t,x)=>t+x.G,0); return {L:txt(e),M:fx(`COUNTIF(${ALL},L${r})`,g.length),N:fx(`COUNTIFS(${ALL},L${r},${rg('O')},"RELEASED")`,0),O:fx(`SUMIFS(${rg('G')},${ALL},L${r})`,wi),P:fx(`IF(O${r}=0,0,SUMPRODUCT((${ALL}=L${r})*${rg('P')}*${rg('G')})/O${r})`,0),Q:fx(`SUMIFS(${rg('S')},${ALL},L${r})`,0),R:fx(`SUMIFS(${rg('T')},${ALL},L${r})`,wi)}; };
+    const S=(r,sp,v)=>rows.push({r,ht:'15',ch:false,cells:cells(sp,v)});
+    S(4,'A70 B70 C70 D70 E70 G70 H70 I70 J70 L70 M70 N70 O70 P70',{A:txt('WEIGHT OF EACH STAGE IN % PROGRESS'),G:txt('SUMMARY'),L:txt('BY ELEMENT')});
+    S(5,'A10 B10 C10 D10 E128 G10 H10 I10 J72 L129 M129 N129 O129 P129 Q129 R129',{A:txt('Fit-up'),E:num(0.2),G:txt('Composite pieces'),J:fx(`COUNTA(${rg('B')})`,n),L:txt('ELEMENT'),M:txt('PIECES'),N:txt('RELEASED'),O:txt('WELD IN.'),P:txt('PROGRESS'),Q:txt('IN. WELDED'),R:txt('IN. PENDING')});
+    S(6,'A10 B10 C10 D10 E128 G10 H10 I10 J72 L10 M64 N64 O75 P76 Q75 R75',Object.assign({A:txt('Welding'),E:num(0.6),G:txt('Fitted (100 %)'),J:fx(`COUNTIF(${rg('V')},">=0.999")`,0)},elRow(6)));
+    S(7,'A10 B10 C10 D10 E128 G10 H10 I10 J72 L10 M64 N64 O75 P76 Q75 R75',Object.assign({A:txt('VT inspection'),E:num(0.2),G:txt('Welded (100 %)'),J:fx(`COUNTIF(${rg('R')},">=0.999")`,0)},elRow(7)));
+    S(8,'A130 B130 C130 D130 E131 G10 H10 I10 J72 L10 M64 N64 O75 P76 Q75 R75',Object.assign({A:txt('Total'),E:fx('SUM(E5:E7)',1),G:txt('Released (VT accepted)'),J:fx(`COUNTIF(${rg('O')},"RELEASED")`,0)},elRow(8)));
+    S(9,'G10 H10 I10 J72 L10 M64 N64 O75 P76 Q75 R75',Object.assign({G:txt('To repair'),J:fx(`COUNTIF(${rg('O')},"REPAIR*")`,0)},elRow(9)));
+    S(10,'G10 H10 I10 J123 L10 M64 N64 O75 P76 Q75 R75',Object.assign({G:txt('Total weld inches (weld map)'),J:fx(`SUM(${rg('G')})`,W)},elRow(10)));
+    S(11,'G10 H10 I10 J123',{G:txt('Inches welded'),J:fx(`SUM(${rg('S')})`,0)});
+    S(12,'G10 H10 I10 J123 L70 M70 N70 O70 P70 Q70 R70',{G:txt('Inches pending'),J:fx(`SUM(${rg('T')})`,W),L:txt('BY FILLET SIZE')});
+    S(13,'G130 H130 I130 J53 L129 M129 N129 O129 P129',{G:txt('% INCHES WELDED'),J:fx(`IF(SUM(${rg('G')})=0,0,SUM(${rg('S')})/SUM(${rg('G')}))`,0),L:txt('FILLET'),M:txt('PIECES'),N:txt('WELD IN.'),O:txt('IN. WELDED'),P:txt('IN. PENDING')});
+    const fRow=r=>{ const h=fills[r-14]; if(!h) return {}; const g=N.filter(x=>x.H===h), wi=g.reduce((t,x)=>t+x.G,0); return {L:txt(h),M:fx(`COUNTIF(${rg('H')},L${r})`,g.length),N:fx(`SUMIFS(${rg('G')},${rg('H')},L${r})`,wi),O:fx(`SUMIFS(${rg('S')},${rg('H')},L${r})`,0),P:fx(`SUMIFS(${rg('T')},${rg('H')},L${r})`,wi)}; };
+    S(14,'G130 H130 I130 J53 L29 M64 N75 O75 P75',Object.assign({G:txt('PROGRESS (weighted by inches)'),J:fx(`IF(SUM(${rg('G')})=0,0,SUMPRODUCT(${rg('P')},${rg('G')})/SUM(${rg('G')}))`,0)},fRow(14)));
+    S(15,'G10 H10 I10 J65 L29 M64 N75 O75 P75',Object.assign({G:txt('Progress by pieces'),J:fx(`IF(COUNTA(${rg('B')})=0,0,AVERAGE(${rg('P')}))`,0)},fRow(15)));
+    rows.push(noteRow(17,85,'FIT-UP DATE, WELD DATE, PIECE DIE STAMP, % FIT / % WELDED, INCHES and STATUS come automatically from the daily records of the BOM sheet (green). Only VT INSPECTION (list) and VT DATE are typed here (yellow).'));
+    S(18,'A124 W67',{A:txt('Example (not real data): Fit-up date 11/16/2026 · Weld date 11/17/2026 · Die stamp C1-1 · VT ACCEPTED · VT date 11/18/2026  →  STATUS = RELEASED, PROGRESS = 100%.'),W:txt('WELD INCHES PER DAY (BOM: welded qty × line inches, on the welder date)')});
+    const HT=['ITEM','MARK','NODE','ELEMENT','PARTS TO WELD (mark · qty · function)','No. WELDS','WELD LENGTH (in)','FILLET','WEIGHT (lb)','FIT-UP DATE (BOM)','WELD DATE (BOM, 100 %)','PIECE DIE STAMP (BOM)','VT INSPECTION','VT DATE','STATUS','% PROGRESS','REMARKS','% WELDED (BOM, by weight)','INCHES WELDED','INCHES PENDING','LAST WELD DATE (BOM)','% FIT (BOM)'];
+    rows.push({r:20,ht:'31.5',ch:true,cells:'ABCDEFGHIJKLMNOPQRSTUV'.split('').map((c,i)=>({c,s:5,v:HT[i]})).concat(['DATE','IN. WELDED (day)','IN. WELDED (cum.)','% OF TOTAL IN.'].map((v,i)=>({c:'WXYZ'[i],s:7,v})))});
+    const PS='A29 B130 C29 D10 E132 F133 G31 H29 I31 J134 K134 L125 M21 N37 O29 P74 Q127 R74 S135 T38 U73 V74', TS='A69 B99 C69 D69 E69 F55 G55 H69 I55 J69 K69 L69 M69 N69 O69 P136 Q69 R136 S55 T55 U69', DS='W73 X75 Y75 Z76', DAYS=140, lastB=bom.last, br=c=>`${BS}$${c}$4:$${c}$${lastB}`;
+    for(let r=a;r<=Math.max(DAYS,T);r++){ const v={}; const x=N[r-a];
+      if(x){ const Y=`${BS}Y${x.f}:Y${x.l}`, U=`${BS}U${x.f}:U${x.l}`, up=(c)=>`MAX(0,MIN(1,${BS}${c}${x.A}*${x.q}-${x.i}))`;
+        Object.assign(v,{A:num(x.node),B:txt(x.mark),C:num(x.node),D:txt(x.el),E:txt(x.E),F:num(x.F),G:num(x.G),H:txt(x.H),I:num(x.I),J:fx(`IF(V${r}>0,IF(COUNT(${U})=0,"",MIN(${U})),"")`,''),K:fx(`IF(R${r}>=0.999,IF(COUNT(${Y})=0,IF(COUNT(${U})=0,"",MAX(${U})),MAX(${Y})),"")`,''),L:fx(`IF(${BS}Z${x.A}<>"",${BS}Z${x.A},"")`,''),
+          O:fx(`IF(OR(M${r}="ACCEPTED",M${r}="ACCEPTED AFTER REPAIR"),"RELEASED",IF(M${r}="REJECTED","REPAIR",IF(R${r}>=0.999,"WELDED",IF(R${r}>0,"IN WELDING",IF(V${r}>=0.999,"FITTED",IF(V${r}>0,"IN FIT-UP","PENDING"))))))`,'PENDING'),P:fx(`$E$5*V${r}+$E$6*R${r}+IF(O${r}="RELEASED",$E$7,0)`,0),R:fx(up('AG'),0),
+          S:fx(`G${r}*IF(O${r}="RELEASED",1,IFERROR(MAX(0,MIN(1,SUM(${BS}AR${x.f}:AR${x.l})/SUM(${BS}AQ${x.f}:AQ${x.l})*${x.q}-${x.i})),0))`,0),T:fx(`G${r}-S${r}`,x.G),U:fx(`IF(COUNT(${Y})=0,"",MAX(${Y}))`,''),V:fx(up('AF'),0)}); }
+      if(r===T) Object.assign(v,{B:txt('TOTAL'),F:fx(`SUM(F${a}:F${z})`,sum('F')),G:fx(`SUM(G${a}:G${z})`,W),I:fx(`SUM(I${a}:I${z})`,sum('I')),P:fx('J14',0),R:fx(`IF(G${T}=0,0,S${T}/G${T})`,0),S:fx(`SUM(S${a}:S${z})`,0),T:fx(`SUM(T${a}:T${z})`,W)});
+      if(r<=DAYS) Object.assign(v,{W:fx(r===a?"'DAILY REPORT'!$C$7":`W${r-1}+1`,st+r-a),X:{f:`IF(W${r}<=TODAY(),SUMIFS(${br('AR')},${br('Y')},W${r},${br('AP')},"<>A"),"")`},Y:{f:r===a?`IF(W${r}<=TODAY(),X${r},"")`:`IF(W${r}<=TODAY(),N(Y${r-1})+X${r},"")`},Z:{f:`IF(W${r}<=TODAY(),IFERROR(Y${r}/$G$${T},0),"")`}});
+      rows.push({r,ht:'15',ch:false,cells:cells([x?PS:r===T?TS:'',r<=DAYS?DS:''].filter(Boolean).join(' '),v)}); }
+    return {rows,lastCol:'Z',filter:`$A$20:$V$${z}`,merges:['A4:E4','A5:D5','A6:D6','A7:D7','A8:D8','G10:I10','G11:I11','G12:I12','G13:I13','G14:I14','G15:I15','G4:J4','G5:I5','G6:I6','G7:I7','G8:I8','G9:I9','L12:R12','L4:P4'],subst:[[/<autoFilter ref="[^"]*">/,`<autoFilter ref="A20:V${z}">`],[/sqref="[^"]*"/g,m=>m.replace(/([A-Z]+21:[A-Z]+)\d+/g,`$1${z}`)]],nodes:N}; };
   AV._rd=rd; AV._g6=g6; AV._ftIn=ftIn;
 })(typeof window!=='undefined'?window:globalThis);
