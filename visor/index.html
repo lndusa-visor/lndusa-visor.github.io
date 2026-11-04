@@ -699,7 +699,7 @@ const APP_SHELL='<div class="wrap" id="app"><div class="top"><div><div class="br
     const nc=await gh(token,'/git/commits',{method:'POST',body:JSON.stringify({message:'Visor '+folder,tree:nt.sha,parents:[head]})});
     await gh(token,'/git/refs/heads/'+BR,{method:'PATCH',body:JSON.stringify({sha:nc.sha})}); }
   // fileList: File[] (un IFC por unidad) · code: US.069.5 · name: nombre corto · token: github_pat_…
-  window.ghPublishVisor=async function({files:fileList,code,name,token,onProgress}){
+  window.ghPublishVisor=async function({files:fileList,code,name,token,onProgress,source}){
     const prog=onProgress||(()=>{}), folder=folderOf(code); if(!folder) throw new Error('Falta el código del proyecto.'); if(!token) throw new Error('Falta el token de GitHub.');
     await gh(token,'');   // valida el token y el acceso al repositorio antes de procesar
     const tpl=await (await fetch(location.href.split('#')[0].split('?')[0],{cache:'no-store'})).text();
@@ -712,6 +712,7 @@ const APP_SHELL='<div class="wrap" id="app"><div class="top"><div><div class="br
     const json=JSON.stringify(data).replace(/</g,'\\u003c');
     let html=tpl.replace(/(<script type="application\/json" id="data">)[\s\S]*?(<\/script>)/,(m,a,b)=>a+json+b).replace(/<script id="ghadmin">[\s\S]*?<\/script>\s*/,'');
     out.unshift({path:'index.html',data:html});
+    if(source) out.push({path:'a/fuente.json',data:JSON.stringify(source)});   // huella del IFC: «Nuevo proyecto» sabe si este visor ya está al día
     await pushFiles(token,folder,out,prog);
     prog('Listo',1);
     return {url:'https://lndusa-visor.github.io/'+folder+'/?lang=en',parts:R.parts.length,asms:R.asms.filter(a=>a.n>1).length,units:R.units||null,files:out.length}; };

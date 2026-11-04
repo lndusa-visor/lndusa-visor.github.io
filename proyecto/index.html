@@ -175,7 +175,7 @@ details.sec>div{padding-top:10px;display:flex;flex-direction:column;gap:10px}
       <div class="group">
         <span class="label">Proyecto</span>
         <div class="row">
-          <div class="field"><label class="hint" for="code">Código</label><input type="text" id="code" value="US.068.1"></div>
+          <div class="field"><label class="hint" for="code">Código</label><input type="text" id="code" value="" placeholder="US.068.4"></div>
           <div class="field"><label class="hint" for="short">Nombre de hojas</label><input type="text" id="short" value="68.1"></div>
         </div>
         <div class="field"><label class="hint" for="pname">Nombre del proyecto</label><input type="text" id="pname" value=""></div>
@@ -3927,6 +3927,7 @@ function toSheet(s){
 async function download(which){
   if(!book) return;
   if(typeof XLSX==='undefined'){ toast('El generador de Excel no cargó. Revisa la conexión y vuelve a abrir la página.'); return; }
+  if(which==='troq'){ const say=t=>{ toast(t); const g=$('ghInfo'); if(g) g.textContent=t; }; if(!(await window.ensureVisorLive(say))) return; }
   const LBL={bom:'BOM trabajado',mat:'Lista por materiales',troq:'Lista de troquelados',pr:'PR para SAP',cut:'Plan de corte'}, lbl=LBL[which];
   const list=which==='cut'?cutSheets():which==='pr'?prSheets():book.sheets.filter(s=>which==='bom'?!s.grp:s.grp===which);
   if(!list.length){ toast(which==='cut'?'No hay perfiles ni placas para el plan de corte.':which==='pr'?'Elige al menos un grupo que tenga material para la PR.':which==='troq'?'No hay piezas principales (líneas amarillas) para la lista de troquelados.':which==='mat'?'No hay perfiles ni placas para la lista por materiales.':'No hay hojas para el BOM trabajado.'); return; }
@@ -4207,6 +4208,7 @@ load(RAW_SAMPLE,'BESS Area PDC and Transformer','Ejemplo: BESS Assembly List BOM
   async function addToAvance(file,info){
     if(typeof P==='undefined'||!P||!book){ info('Primero carga los BOM, el IFC y el Bolt Summary del proyecto.'); return; }
     if(typeof JSZip==='undefined'){ info('No cargó el lector de Excel (JSZip). Revisa la conexión.'); return; }
+    if(!(await window.ensureVisorLive(info))) return;
     info('Leyendo el Excel de avance…'); const T=await JSZip.loadAsync(await file.arrayBuffer());
     const wx=await T.file('xl/workbook.xml').async('string'), wr=await T.file('xl/_rels/workbook.xml.rels').async('string');
     const sheetsT=(wx.match(/<sheet\b[^>]*>/g)||[]).map(t=>({name:(/name="([^"]*)"/.exec(t)||[])[1].replace(/&amp;/g,'&').replace(/&apos;/g,"'"),rid:(/r:id="([^"]*)"/.exec(t)||[])[1],id:+(/sheetId="(\d+)"/.exec(t)||[])[1]}));
@@ -4291,21 +4293,44 @@ load(RAW_SAMPLE,'BESS Area PDC and Transformer','Ejemplo: BESS Assembly List BOM
   try{ tk.value=localStorage.getItem('gh.token')||''; }catch(e){}
   tk.addEventListener('change',()=>{ try{ localStorage.setItem('gh.token',tk.value.trim()); }catch(e){} });
   const esc2=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  // huella de los IFC cargados: dice si el visor publicado ya es de este modelo
+  const ifcHash=async fs=>{ const t=(await Promise.all([...fs].sort((a,b)=>a.name<b.name?-1:1).map(f=>f.text()))).join('\n'), d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t)); return [...new Uint8Array(d)].map(x=>x.toString(16).padStart(2,'0')).join(''); };
+  const folderOf=c=>String(c||'').trim().replace(/[^A-Za-z0-9._-]+/g,'_');
+  const source=async(fs,code)=>({ifc:await ifcHash(fs),code,updated:new Date().toISOString().slice(0,10)});
+  window.__visorPub=async function({files,code,name,token,onProgress,source}){ const fr=document.createElement('iframe'); fr.style.cssText='position:fixed;left:-3000px;top:0;width:1200px;height:800px;border:0'; fr.src='../visor/?admin=1'; document.body.appendChild(fr);
+    try{ await new Promise((ok,ko)=>{ fr.onload=ok; fr.onerror=ko; setTimeout(()=>ko(new Error('La plantilla del visor no cargó.')),60000); });
+      let n=0; while(!fr.contentWindow.ghPublishVisor&&n++<50) await new Promise(r=>setTimeout(r,200));
+      if(!fr.contentWindow.ghPublishVisor) throw new Error('La plantilla del visor no cargó.');
+      return await fr.contentWindow.ghPublishVisor({files,code,name,token,onProgress,source}); }
+    finally{ fr.remove(); } };
   bt.onclick=async()=>{ const files=window.__ifcFiles||[], code=($$('code').value||'').trim(), token=tk.value.trim();
     if(!files.length){ info.textContent='Primero carga el IFC (uno por unidad).'; return; }
     if(!code){ info.textContent='Escribe el código del proyecto (p. ej. US.069.5).'; return; }
     if(!token){ info.textContent='Pega el token de GitHub.'; tk.focus(); return; }
     try{ localStorage.setItem('gh.token',token); }catch(e){}
     bt.disabled=true; info.textContent='Preparando…';
-    const fr=document.createElement('iframe'); fr.style.cssText='position:fixed;left:-3000px;top:0;width:1200px;height:800px;border:0'; fr.src='../visor/?admin=1';
-    document.body.appendChild(fr);
-    try{ await new Promise((ok,ko)=>{ fr.onload=ok; fr.onerror=ko; setTimeout(()=>ko(new Error('La plantilla del visor no cargó.')),60000); });
-      let n=0; while(!fr.contentWindow.ghPublishVisor&&n++<50) await new Promise(r=>setTimeout(r,200));
-      if(!fr.contentWindow.ghPublishVisor) throw new Error('La plantilla del visor no cargó.');
-      const r=await fr.contentWindow.ghPublishVisor({files,code,name:($$('pname').value||'').trim(),token,onProgress:(t,f)=>{ info.textContent=t+(f!=null?` (${Math.round(f*100)}%)`:''); }});
+    try{ const r=await window.__visorPub({files,code,name:($$('pname').value||'').trim(),token,source:await source(files,code),onProgress:(t,f)=>{ info.textContent=t+(f!=null?` (${Math.round(f*100)}%)`:''); }});
       info.innerHTML=`Publicado: ${r.parts} partes y ${r.asms} piezas soldadas${r.units?' en '+r.units.length+' unidades':''}. Link: <a href="${esc2(r.url)}" target="_blank" rel="noopener">${esc2(r.url)}</a> (GitHub tarda 1–2 minutos en mostrarlo).`;
-    }catch(e){ console.error(e); info.textContent=(e&&e.status===401?'El token no sirve o venció. ':e&&e.status===404?'El token no tiene acceso al repositorio lndusa-visor.github.io. ':'')+'No se pudo publicar: '+(e&&e.message||e); }
-    finally{ bt.disabled=false; fr.remove(); } };
+    }catch(e){ console.error(e); info.textContent=pubErr(e); }
+    finally{ bt.disabled=false; } };
+  const pubErr=e=>(e&&e.status===401?'El token no sirve o venció. ':e&&e.status===404?'El token no tiene acceso al repositorio lndusa-visor.github.io. ':'')+'No se pudo publicar: '+(e&&e.message||e);
+  /* el QR solo sale con el visor vivo: revisa el código, compara el IFC, publica si hace falta y espera a que el enlace abra.
+     Devuelve true si se puede generar la lista. Un enlace escrito a mano en el campo del visor se respeta tal cual. */
+  const look=async folder=>{ const q=`${GH_BASE}${folder}/`, r=await fetch(q+'index.html?t='+Date.now(),{cache:'no-store'}); if(r.status===404) return {live:false}; if(!r.ok) throw new Error('GitHub '+r.status); let src=null; try{ const f=await fetch(q+'a/fuente.json?t='+Date.now(),{cache:'no-store'}); if(f.ok) src=await f.json(); }catch(e){} return {live:true,src}; };
+  const okLive=new Set(); let running=null;
+  async function check(say){ const code=($$('code').value||'').trim(), hand=(($$('visorIn')||{}).value||'').trim(); if(hand) return true;
+    if(!code){ say('Escribe el código del proyecto antes de generar los QR.'); $$('code').focus(); return false; }
+    const folder=folderOf(code), url=`${GH_BASE}${folder}/`, files=window.__ifcFiles||[]; let hash=null, st;
+    try{ say('Revisando el visor…'); hash=files.length?await ifcHash(files):null; if(okLive.has(folder+'|'+hash)) return true; st=await look(folder); }catch(e){ console.error(e); say('No pude revisar el visor. Revisa la conexión; no se generó la lista.'); return false; }
+    if(!files.length){ if(st.live) return true; say('Falta el IFC para publicar el visor; no se generó la lista.'); return false; }
+    if(st.live&&st.src&&st.src.ifc===hash){ okLive.add(folder+'|'+hash); return true; }
+    const ok=st.live?confirm(`Ya hay un visor en ${url}${st.src?' con otro IFC':''}.\n\n¿Lo reemplazo con el IFC cargado?\n\nSi el código no es de este proyecto, cancela y corrígelo.`):confirm(`Voy a publicar un visor nuevo en ${url}\n\n¿El código ${code} es correcto?`);
+    if(!ok){ say('No se generó la lista. Revisa el código del proyecto.'); $$('code').focus(); return false; }
+    const token=(tk.value||'').trim(); if(!token){ say('Pega el token de GitHub y vuelve a generar.'); tk.scrollIntoView({block:'center'}); tk.focus(); return false; } try{ localStorage.setItem('gh.token',token); }catch(e){}
+    try{ await window.__visorPub({files,code,name:($$('pname').value||'').trim(),token,source:await source(files,code),onProgress:(t,f)=>say(t+(f!=null?` (${Math.round(f*100)}%)`:''))}); }catch(e){ console.error(e); say(pubErr(e)+' No se generó la lista.'); return false; }
+    const end=Date.now()+(window.__visorMax||6*60000); while(Date.now()<end){ say('Esperando a que el visor abra…'); await new Promise(r=>setTimeout(r,window.__visorPoll||10000)); try{ const n=await look(folder); if(n.live&&n.src&&n.src.ifc===hash){ okLive.add(folder+'|'+hash); say('Visor vivo.'); return true; } }catch(e){} }
+    say('El visor se subió, pero el enlace todavía no abre. Vuelve a generar en unos minutos.'); return false; }
+  window.ensureVisorLive=say=>{ if(running) return running; running=check(say).catch(e=>{ console.error(e); say('No se pudo preparar el visor: '+(e&&e.message||e)); return false; }).finally(()=>{ running=null; }); return running; };
 })();
 </script>
 <script src="avance-gen.js"></script>
@@ -4330,7 +4355,7 @@ load(RAW_SAMPLE,'BESS Area PDC and Transformer','Ejemplo: BESS Assembly List BOM
     if(typeof P==='undefined'||!P||!book){ info('Primero carga los BOM.'); return; }
     if(typeof ifc==='undefined'||!ifc||typeof asmGeo==='undefined'||!asmGeo.size){ info('Falta el IFC.'); return; }
     if(typeof bolts==='undefined'||!bolts){ info('Falta el Bolt Summary.'); return; }
-    btn.disabled=true; info('Preparando…');
+    btn.disabled=true; if(!(await window.ensureVisorLive(info))) return; info('Preparando…');
     const [tR,jR]=await Promise.all([fetch('avance-plantilla.xlsx',{cache:'no-store'}),fetch('avance-tpl-bom.json',{cache:'no-store'})]); if(!tR.ok||!jR.ok) throw new Error('No pude leer la plantilla del Excel.');
     const tpl=await tR.arrayBuffer(), bt=await jR.json(), stock={}; let free=[];
     book.profs.forEach(p=>{ const k=String(p.prof).split('|')[0], v=typeof p.stock==='number'?p.stock:(typeof p.sel==='number'?p.sel:+p.sel); if(v>0) stock[k]=v; else free.push(k); });

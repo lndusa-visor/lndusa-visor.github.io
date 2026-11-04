@@ -96,6 +96,13 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 - Paneles del tablero comparados contra el original (con three.js simulado): iguales, salvo esos textos. Excel generado: 3D CONTROL con 0 filas distintas y cada ID cae en su marca y pieza.
 - Sin probar con three.js ni SheetJS reales: la red de esa sesión los bloqueó. Falta ver el 3D en un navegador real.
 
+## QR con visor vivo (ensureVisorLive en index.html)
+- Corre antes de la Lista de troquelados, de «Agregar al Excel de avance» y de «Generar Excel de avance». El QR sale solo si el enlace ya abre.
+- Compara la huella SHA-256 de los IFC con CÓDIGO/a/fuente.json: igual = no sube nada; otro IFC o visor sin huella = confirma antes de reemplazar; visor nuevo = confirma el código.
+- Un enlace escrito a mano en el campo del visor se respeta sin revisarlo. Sin IFC, sirve si el visor ya abre.
+- El código ya no trae US.068.1 de fábrica. deriveCode desde el BOM puede dar solo US.068, sin el número de unidad: por eso se confirma.
+- Probado con publicación y GitHub simulados; falta la prueba con un proyecto real en main.
+
 ## Control de pruebas
 - Los troqueles de la columna Z de BOM CONNECTION no los pone el generador: los agrega el paso «Agregar al Excel de avance». Falta encadenarlo.
 
