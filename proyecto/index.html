@@ -152,20 +152,20 @@ details.sec>div{padding-top:10px;display:flex;flex-direction:column;gap:10px}
           <label class="hint" for="visorIn" style="margin-top:6px">Enlace del Visor de piezas</label>
           <input type="url" class="vis" id="visorIn" placeholder="(vacío = https://lndusa-visor.github.io/CÓDIGO/)" autocomplete="off" style="width:100%;box-sizing:border-box;padding:8px;font:inherit">
           <label class="hint" for="stLetter" style="margin-top:8px">Letra del troquel (C1, C2, C3… en todo el proyecto)</label>
-          <input type="text" id="stLetter" maxlength="3" value="C" autocomplete="off" style="width:80px;padding:8px;font:inherit;text-transform:uppercase">
+          <input type="text" class="vis" id="stLetter" maxlength="3" value="C" autocomplete="off" style="width:80px;padding:8px;font:inherit;text-transform:uppercase">
           <span class="hint" id="visorHint" aria-live="polite"></span>
           <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
             <b>Publicar visor en GitHub</b>
             <span class="hint">Arma el visor 3D con los IFC cargados y lo sube a <code>lndusa-visor.github.io/CÓDIGO/</code>. Los QR de la lista ya apuntan ahí. La primera vez pide el token de GitHub; queda guardado solo en esta computadora.</span>
             <label class="hint" for="ghToken" style="margin-top:6px">Token de GitHub (github_pat_…)</label>
-            <input type="password" id="ghToken" autocomplete="off" placeholder="github_pat_…" style="width:100%;box-sizing:border-box;padding:8px;font:inherit">
+            <input type="password" class="vis" id="ghToken" autocomplete="off" placeholder="github_pat_…" style="width:100%;box-sizing:border-box;padding:8px;font:inherit">
             <div class="row" style="margin-top:8px;align-items:center"><button type="button" id="ghPub">Publicar visor en GitHub</button><span class="hint" id="ghInfo" aria-live="polite"></span></div>
           </div>
           <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
             <b>Generar Excel de avance</b>
             <span class="hint">Con el BOM, el IFC y el Bolt Summary cargados, arma el Excel de avance completo de cada unidad, con los troqueles y las pestañas LISTA DE TROQUELADOS, PR SAP y PLAN DE CORTE. Usa la tabla de materiales de aquí abajo y la lámina elegida en el optimizador.</span>
             <div id="matBox" style="margin-top:8px;overflow-x:auto"></div>
-            <div class="row" style="margin-top:8px;align-items:center"><div class="field" style="flex:0 1 170px"><label class="hint" for="avStart">Fecha de inicio</label><input type="date" id="avStart"></div><button type="button" id="avGen">Generar Excel de avance</button><span class="hint" id="avGenInfo" aria-live="polite"></span></div>
+            <div class="row" style="margin-top:8px;align-items:center"><div class="field" style="flex:0 1 170px"><label class="hint" for="avStart">Fecha de inicio</label><input type="date" class="vis" id="avStart"></div><button type="button" id="avGen">Generar Excel de avance</button><span class="hint" id="avGenInfo" aria-live="polite"></span></div>
           </div>
           <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
             <b>Publicar en el tablero</b>
@@ -3560,7 +3560,7 @@ let ifc=null, P=null, origAoa=null, origName='', fileBase='BOM_US068.1', cls={},
 
 // el código arma el enlace de los QR: si el BOM solo trae una parte (US.068 sin el .4) queda por confirmar
 let codePending=true;
-function codeState(){ const c=$('code').value.trim(), h=$('codeHint'), b=$('codeOk'); h.textContent=!c?'Escribe el código antes de generar los QR.':codePending?`Por confirmar: del BOM salió ${c}. Corrígelo si le falta el número de unidad (ej. ${c}.4).`:`Enlace: lndusa-visor.github.io/${c.replace(/[^A-Za-z0-9._-]+/g,'_')}/`; b.hidden=!(c&&codePending); }
+function codeState(){ const c=$('code').value.trim(), h=$('codeHint'), b=$('codeOk'); h.textContent=!c?'Escribe el código antes de generar los QR.':codePending?`Por confirmar: del BOM salió ${c}. Corrígelo si le falta el número de unidad (ej. ${c}.4).`:`Enlace: lndusa-visor.github.io/${c.replace(/[^A-Za-z0-9._-]+/g,'_')}/`; b.hidden=!(c&&codePending); const vh=$('visorHint'), vi=$('visorIn'); if(vh&&vi&&!vi.value.trim()) vh.textContent=`Los QR van a ${visorDefault()||'lndusa-visor.github.io/CÓDIGO/'}`; }
 function codeFromBom(d){ if(d){ $('code').value=d.code; $('short').value=d.short; } codePending=!d||!/^US\.\d{3}\.\d+$/.test(d.code); codeState(); }
 window.codeNeedsOk=()=>codePending||!$('code').value.trim();
 function deriveCode(name,bom){
