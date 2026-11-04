@@ -298,5 +298,11 @@
       M:fx(`IF(K${r}="READY TO SHIP",IF(L${r}<>"",L${r},IF(J${r}<>"",J${r},"")),"")`,''),N:fx(`IF(AND(Q${r}<>"",K${r}="READY TO SHIP"),"IN TRANSIT",IF(K${r}="READY TO SHIP","READY TO SHIP",IF(K${r}="REJECTED","REPAIR",IF(J${r}<>"","PAINTING",IF(I${r}="NO","WAITING FOR WELD","PENDING")))))`,x.comp?'WAITING FOR WELD':'PENDING'),O:fx(`IF(OR(J${r}<>"",K${r}="READY TO SHIP"),1,0)`,0)},x.node?{D:num(x.node)}:{})); });
     S(T,'15','A69 B99 C69 D69 E69 F69 G55 H55 I69 J69 K69 L69 M69 N69 O136 P69 Q69 R69',{B:txt('TOTAL'),G:fx(`SUM(G${a}:G${z})`,TA),H:fx(`SUM(H${a}:H${z})`,sum('w')),O:fx('K12',0)});
     return {rows,lastCol:'R',filter:`$A$24:$R$${z}`,merges:['A4:F4','H10:J10','H11:J11','H12:J12','H4:K4','H5:J5','H6:J6','H7:J7','H8:J8','H9:J9','M4:P4'],subst:[[/<autoFilter ref="[^"]*">/,`<autoFilter ref="A24:R${z}">`],[/sqref="[^"]*"/g,m=>m.replace(/([A-Z]+25:[A-Z]+)\d+/g,`$1${z}`)]],pieces:P}; };
+
+  // resumen del modelo que usan WELDING y PAINTING (sin referencias circulares)
+  AV.modelSummary=M=>M.map(x=>({mark:x.a.mark,qty:x.a.qty,comp:x.comp,pwt:x.a.row&&x.a.row.pwt,twt:x.a.row&&x.a.row.twt,sa:x.a.row&&x.a.row.saAll,seq:x.weldSeq,
+    loose:x.parts.filter(p=>p.loose).reduce((t,p)=>t+(p.r.pwt||0)*p.r.qty,0),looseT:x.parts.filter(p=>p.loose).reduce((t,p)=>t+(p.r.twt||0),0),looseSa:x.parts.filter(p=>p.loose).reduce((t,p)=>t+(p.r.saAll||0),0),
+    lp:x.parts.filter(p=>p.loose).map(p=>({mark:p.r.mark,qty:p.r.qty,pwt:p.r.pwt,twt:p.r.twt,sa:p.r.saAll,type:p.ptype||(/^L\s*\d/i.test(String(p.r.D||p.r.desc||''))?'CLIP_ANGLE':p.role)})),
+    wp:x.parts.filter(p=>p.welded).map(p=>({k:p.k,mark:p.r.mark,qty:p.r.qty,role:p.role,n:p.weldN,weld:p.weld}))}));
   AV._rd=rd; AV._g6=g6; AV._ftIn=ftIn;
 })(typeof window!=='undefined'?window:globalThis);
