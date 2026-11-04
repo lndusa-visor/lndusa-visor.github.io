@@ -4286,6 +4286,7 @@ load(RAW_SAMPLE,'BESS Area PDC and Transformer','Ejemplo: BESS Assembly List BOM
     T.file('xl/workbook.xml',w2); T.file('xl/_rels/workbook.xml.rels',rel2);
     let ct=await T.file('[Content_Types].xml').async('string'); if(!/Extension="png"/i.test(ct)) ct=ct.replace('<Default ','<Default Extension="png" ContentType="image/png"/><Default '); ct=ct.replace('</Types>',state.ct.join('')+'</Types>'); T.file('[Content_Types].xml',ct);
     info('Comprimiendo…');
+    await AV.fixCharts(T);
     const blob=await T.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const name=file.name.replace(/\.xlsx?$/i,'')+'_con troquel.xlsx';
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },3000);

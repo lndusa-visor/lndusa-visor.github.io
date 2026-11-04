@@ -385,5 +385,10 @@
     let wb=await Z.file('xl/workbook.xml').async('string'); wb=wb.split(TPL.bomSheet).join(Nm.sheet.replace(/&/g,'&amp;')).replace(/\$A\$3:\$AT\$\d+/,`$A$3:$AT$${S.last}`).replace(/\$A\$10:\$Z\$\d+/,C.filter).replace(/\$A\$24:\$R\$\d+/,Pt.filter).replace(/\$A\$4:\$M\$\d+/,R.takeoff.filter).replace(/\$A\$20:\$V\$\d+/,Wd.filter).replace(/\$A\$19:\$AK\$\d+/,Ct.filter); Z.file('xl/workbook.xml',wb);
     const blob=await Z.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     return {blob,name:`BOM_Connection_Type_${Nm.proj.replace(/\s+/g,'_')}_EN.xlsx`,over:R.over,overPlates:R.overPlates,miss:Ct.miss}; };
+  // Excel pide reparar lo que LibreOffice deja en las gráficas: noMultiLvlLbl en un eje de fechas e id="0" en el dibujo. No toca hojas ni fórmulas.
+  AV.fixCharts=async function(Z){ let n=0; for(const name of Object.keys(Z.files)){ const ch=/^xl\/charts\/chart\d+\.xml$/.test(name), dr=/^xl\/drawings\/drawing\d+\.xml$/.test(name); if(!ch&&!dr) continue; const x=await Z.file(name).async('string'); let y=x;
+      if(ch) y=x.replace(/<c:dateAx>[\s\S]*?<\/c:dateAx>/g,m=>m.replace(/<c:noMultiLvlLbl[^>]*\/>/g,''));
+      else if(x.includes('<xdr:cNvPr id="0"')){ let k=Math.max(1,...[...x.matchAll(/<xdr:cNvPr id="(\d+)"/g)].map(m=>+m[1])); y=x.replace(/<xdr:cNvPr id="0"/g,()=>`<xdr:cNvPr id="${++k}"`); }
+      if(y!==x){ Z.file(name,y); n++; } } return n; };
   AV._rd=rd; AV._g6=g6; AV._ftIn=ftIn;
 })(typeof window!=='undefined'?window:globalThis);

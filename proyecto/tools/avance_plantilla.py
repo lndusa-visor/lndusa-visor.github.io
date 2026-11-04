@@ -44,5 +44,11 @@ for n in z.namelist():
     if n in files: b=files[n].encode()
     elif n.startswith('xl/charts/chart') and n.endswith('.xml'):
         b=re.sub(r'<c:(num|str)Cache>.*?</c:\1Cache>','',b.decode(),flags=re.S).encode()
+    if re.match(r'xl/drawings/drawing\d+\.xml$',n):   # LibreOffice deja id="0" en las gráficas y Excel pide reparar el archivo
+        k=[1]
+        def nid(m): k[0]+=1; return f'<xdr:cNvPr id="{k[0]}"'
+        b=re.sub(r'<xdr:cNvPr id="0"',nid,b.decode()).encode()
+    if re.match(r'xl/charts/chart\d+\.xml$',n):   # noMultiLvlLbl no es válido en un eje de fechas: Excel pide reparar la gráfica
+        b=re.sub(r'<c:dateAx>.*?</c:dateAx>',lambda m:re.sub(r'<c:noMultiLvlLbl[^>]*/>','',m[0]),b.decode(),flags=re.S).encode()
     o.writestr(n,b)
 o.close(); print('plantilla',len(o.namelist()) if False else 'ok')

@@ -109,6 +109,11 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 - El Excel nuevo sale sin notas: se vacían B:K de las filas 6–12; quedan numeración, listas y la fórmula OVERDUE. Los Excel existentes no se tocan.
 - WEEKLY CUT-OFFS B4 (dato, no fórmula) = primer viernes desde la fecha de inicio.
 
+## Aviso de reparación de Excel
+- Excel reparó drawing2, 3, 5 y 8: son las 6 gráficas. Causa encontrada: noMultiLvlLbl dentro de c:dateAx, que LibreOffice escribe y el esquema no permite.
+- Corregido en la plantilla, en tools/avance_plantilla.py y en addToAvance (AV.fixCharts). Solo cambia chart*.xml y drawing*.xml.
+- Falta confirmar en Excel real con la copia corregida.
+
 ## Control de pruebas
 - Los troqueles de la columna Z de BOM CONNECTION no los pone el generador: los agrega el paso «Agregar al Excel de avance». Falta encadenarlo.
 
