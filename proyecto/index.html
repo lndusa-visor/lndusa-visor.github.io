@@ -3364,9 +3364,9 @@ function partDrawing(meta){ if(meta&&typeof meta==='object'&&PD_MEMO.has(meta)) 
 function partDrawing0(meta){
   if(meta.kind==='svg') return {svg:meta.svg,w:meta.w,h:meta.h,src:''};
   if(meta.kind==='asm'){ const d=asmSVG(meta.asm); if(d) return d; return partDrawing0(meta.fb); }
-  // texto a un lado del QR, no debajo: el renglón baja de alto y el QR conserva su tamaño para que se pueda escanear impreso
-  if(meta.kind==='qr'&&meta.cap){ const q=qrSVG(meta.url,TQ_QR,2).replace(/^<svg\b/,'<svg x="0" y="0"'), W=TQ_QR+13, cap=String(meta.cap), fit=cap.length*5.6>TQ_QR-4?` textLength="${TQ_QR-4}" lengthAdjust="spacingAndGlyphs"`:'';
-    return {svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${TQ_QR}" viewBox="0 0 ${W} ${TQ_QR}"><rect width="${W}" height="${TQ_QR}" fill="#fff"/>${q}<text transform="translate(${W-3} ${TQ_QR/2}) rotate(-90)" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="10.5" font-weight="700" fill="#000"${fit}>${cap.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</text></svg>`,w:W,h:TQ_QR,src:'QR → '+meta.url}; }
+  // texto debajo del QR, con lo justo de espacio para que el renglón no crezca de más
+  if(meta.kind==='qr'&&meta.cap){ const q=qrSVG(meta.url,TQ_QR,2).replace(/^<svg\b/,'<svg x="0" y="0"'), H=TQ_QR+12, cap=String(meta.cap), fit=cap.length*5.6>TQ_QR-2?` textLength="${TQ_QR-2}" lengthAdjust="spacingAndGlyphs"`:'';
+    return {svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${TQ_QR}" height="${H}" viewBox="0 0 ${TQ_QR} ${H}"><rect width="${TQ_QR}" height="${H}" fill="#fff"/>${q}<text x="${TQ_QR/2}" y="${H-2}" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="10.5" font-weight="700" fill="#000"${fit}>${cap.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</text></svg>`,w:TQ_QR,h:H,src:'QR → '+meta.url}; }
   if(meta.kind==='qr') return meta.tq?{svg:qrSVG(meta.url,TQ_QR,2),w:TQ_QR,h:TQ_QR,src:'QR → '+meta.url}:{svg:qrSVG(meta.url,84),w:84,h:84,src:'QR → '+meta.url};
   const f=partFor(meta.mark);
   if(f&&f.kind==='pdf') return {png:f.url,w:f.w,h:f.h,src:f.file};
