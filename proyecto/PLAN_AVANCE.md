@@ -78,6 +78,12 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 ## Recálculo real
 - Para probar, se quitan todos los resultados guardados de las fórmulas antes de abrir en LibreOffice; si no, conserva los guardados. 15 hojas, 0 errores en 30 m y 55 m.
 
+## Excel completo (AV.generate + addToAvance)
+- avance-plantilla.xlsx sale de tools/avance_plantilla.py (15 hojas, sin datos del proyecto, salvo el cronograma de WEEKLY NOTES). AV.generate arma el Excel de una unidad; después va addToAvance.
+- Probado en navegador con la librería real (xlsx-js-style) y JSZip, cargando 30 m y 55 m juntos: 19 hojas, misma estructura y formato; pestañas agregadas idénticas a la referencia. Falta botón en la página y unificar el cronograma.
+- Solo cambian: decimales de peso/área del BOM, regla de soldadura aceptada, nota de pernos del 30 m, 8 pesos de 0.1 lb.
+- bolts.list y P.units[].meta guardan los datos de cada unidad.
+
 ## Control de pruebas
 - Los troqueles de la columna Z de BOM CONNECTION no los pone el generador: los agrega el paso «Agregar al Excel de avance». Falta encadenarlo.
 

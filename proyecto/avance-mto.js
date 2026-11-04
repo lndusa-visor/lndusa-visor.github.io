@@ -290,7 +290,7 @@
     co(10,72,{A:txt('Total system'),B:txt('Total DFT ≥ 325 µm (checked at final inspection)'),C:txt('—'),D:txt('—'),E:num(325),F:num(12.8),H:txt('READY TO SHIP (inspection accepted)'),K:fx(`COUNT(${rg('M')})`,0)});
     S(11,'15','H10 I10 J10 K72'+E,Object.assign({H:txt('IN TRANSIT (with packing list)'),K:fx(`COUNTIF(${rg('N')},"IN TRANSIT")`,0)},elv(11)));
     S(12,'15','A85 H130 I130 J130 K53'+E,Object.assign({A:txt('PAINTING DATE = date the piece was painted (complete system). B&P weight 25 % of the piece; final inspection accepted = READY TO SHIP (10 %).'),H:txt('PROGRESS (area painted)'),K:fx(`IF(SUM(${rg('G')})=0,0,SUMPRODUCT(${rg('O')},${rg('G')})/SUM(${rg('G')}))`,0)},elv(12)));
-    S(13,'15',E.trim(),elv(13));
+    for(let r=13;r<=16;r++) S(r,'15',E.trim(),elv(r));
     rows.push(noteRow(21,85,'How to fill: PAINTING DATE when the piece is painted, then FINAL INSPECTION (list) and its date. STATUS and % PROGRESS are calculated; WELD RELEASED is read from WELDING PROGRESS. READY TO SHIP = final inspection accepted. When shipped, enter PACKING LIST No. and SHIP DATE → IN TRANSIT.'),noteRow(22,124,'Fill example (not real data): Painting date 12/10/2026 · Final inspection READY TO SHIP · 12/11/2026 → STATUS = READY TO SHIP · Packing list PL-010 · Ship date 12/14/2026 → IN TRANSIT.'));
     const HH=['ITEM','MARK','PIECE','NODE','ELEMENT','CONDITION','AREA (ft²)','WEIGHT (lb)','WELD RELEASED','PAINTING DATE','FINAL INSPECTION','INSP. DATE','READY TO SHIP DATE','STATUS','% PROGRESS (B&P)','REMARKS','PACKING LIST No.','SHIP DATE'];
     rows.push({r:24,ht:'45',ch:true,cells:'ABCDEFGHIJKLMNOPQR'.split('').map((c,i)=>({c,s:5,v:HH[i]}))});
@@ -367,5 +367,24 @@
     let c=retarget(tpl.summary,T,N); const ct=r=>cellText(c,r,sst), A16=ct('A16').replace(/\([^()]*\bunder\b[^()]*?, shop bolted/,`(${lEn}, shop bolted`), bd=o.boltDoc;
     [['A1',`SUMMARY – CONNECTION TYPE (${o.proj})`],['E12',`Bolt Summary ${bd} – SHOP BOLT`],['E13',`Bolt Summary ${bd} – FIELD BOLT`],['A14',`Adhesive anchors ${A.desc}`],['C14',A.model],['E14',`IFC ${A.model} (${A.basePlates} base plates × ${A.perPlate}) · Bolt Summary ${A.n}`],['A16',A16]].forEach(([r,v])=>{ c=setCell(c,r,v); }); out.summary=c; return out; };
   AV.looseList=M=>{ const o=[]; M.forEach(x=>(x.lp||[]).forEach(l=>o.push({mark:l.mark,qty:l.qty,asm:x.mark}))); return o; };
+
+  /* ---- Excel de avance completo de una unidad: plantilla + hojas generadas. Después va «Agregar al Excel de avance» (troqueles y pestañas). ---- */
+  const TPL={bomSheet:'BOM TPL - CONNECTION',bomLast:204,bomTot:206,ctlLast:579,wTot:148};
+  // el Bolt Summary de la unidad: el que nombra su proyecto; si no, el del mismo orden de carga
+  AV.boltForUnit=(list,meta,i)=>{ const key=(String(meta.model||meta.project||'').match(/(\d+)\s*m\b/i)||[])[1]; const hit=key&&list.find(b=>new RegExp(key+'\\s*m\\b','i').test(String(b.meta&&b.meta.job||''))); return hit||list[i]||list[0]; };
+  AV.generate=async function(tplBuf,bomTpl,o){ const un=t=>t.replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+    const Z=await JSZip.loadAsync(tplBuf), rd=n=>Z.file(`xl/worksheets/sheet${n}.xml`).async('string'), wr=(n,x)=>Z.file(`xl/worksheets/sheet${n}.xml`,x);
+    const M0=AV.model(o.unit), MS=AV.modelSummary(M0), G=asmGeo.get(normMark(M0[0].a.mark)).G, ELEV=AV.pieceElevations(G,MS), ui=o.unit&&P.units?P.units.findIndex(u=>u.label===o.unit):-1, uM=ui>=0&&P.units[ui].meta||P.meta, bl=bolts&&bolts.list&&ui>=0?AV.boltForUnit(bolts.list,uM,ui):bolts, Nm=AV.names(uM,M0.map(x=>x.a.mark),bl&&bl.meta), B=AV.boltInput(bl), shopBolt=AV.shopBoltText(B);
+    const S=AV.bomSheet(M0,{tpl:bomTpl,title:Nm.title,boltDoc:Nm.boltDoc,shopBolt}), parts=AV.mtoParts(S), am=AV.anchorModel(S); if(B.anchors&&am) Object.assign(B.anchors,am);
+    const totI=(S.rows.find(R=>R.r===S.TOT).cells.find(c=>c.c==='I')||{}).v, bomDoc=(Nm.doc.match(/BOM-\d+/)||[''])[0];
+    const OPT=Object.assign({},B,{parts,stock:o.stock,sheet:o.sheet||[4,8],proj:Nm.proj,bomDoc,bomDocFull:Nm.doc,bomSheet:Nm.sheet,bomTotalRow:S.TOT,bomTotal:totI,spares:o.spares??0.05,startDate:o.startDate,mtoFile:o.mtoFile,ptpDocFull:o.ptpDocFull,kerf:o.kerf,trim:o.trim,gap:o.gap,edge:o.edge});
+    const R=AV.mtoSheets(OPT), V=AV.vendorSheets(OPT,R), C=AV.cuttingSheet(OPT,parts), bomI={rows:S.rows,last:S.last}, Wd=AV.weldingSheet(OPT,MS,bomI), Pt=AV.paintingSheet(OPT,MS,bomI,Wd), Ct=AV.controlSheet(OPT,MS,bomI,R,V,Wd,Pt,ELEV);
+    const sstx=await Z.file('xl/sharedStrings.xml').async('string'), sst=[...sstx.matchAll(/<si>([\s\S]*?)<\/si>/g)].map(m=>un([...m[1].matchAll(/<t[^>]*>([^<]*)<\/t>/g)].map(x=>x[1]).join('')));
+    const GR=[...(G.assemblies||new Map()).values()].filter(v=>/GROUT/i.test(v.name||'')).map(v=>({mark:v.mark,inst:(G.instances||[]).filter(i=>i.asmMark===v.mark).length})), FS=AV.finishSheets({daily:await rd(3),notes:await rd(4),summary:await rd(5),cuts:await rd(11)},sst,TPL,Object.assign({},OPT,{bomLast:S.last,ctlLast:19+Pt.pieces.length,wTot:21+Wd.nodes.length,loose:AV.looseList(MS),grout:GR.reduce((t,v)=>t+v.inst,0),groutMark:GR[0]?String(GR[0].mark).replace(/\(.*$/,''):'',shopBolt}));
+    const put=async(n,Sh)=>wr(n,AV.sheetXml(await rd(n),Sh)); await put(1,S); await put(2,C); await put(6,V.vendor); await put(7,V.po); await put(8,Wd); await put(9,Pt); await put(10,Ct); await put(12,R.takeoff); await put(13,R.mto); await put(14,R.plan); await put(15,R.nesting);
+    wr(3,FS.daily.replace(/(<c r="C7"[^>]*>)<v>[^<]*<\/v>/,`$1<v>${serial(o.startDate)}</v>`)); wr(4,FS.notes); wr(5,FS.summary); wr(11,FS.cuts);
+    let wb=await Z.file('xl/workbook.xml').async('string'); wb=wb.split(TPL.bomSheet).join(Nm.sheet.replace(/&/g,'&amp;')).replace(/\$A\$3:\$AT\$\d+/,`$A$3:$AT$${S.last}`).replace(/\$A\$10:\$Z\$\d+/,C.filter).replace(/\$A\$24:\$R\$\d+/,Pt.filter).replace(/\$A\$4:\$M\$\d+/,R.takeoff.filter).replace(/\$A\$20:\$V\$\d+/,Wd.filter).replace(/\$A\$19:\$AK\$\d+/,Ct.filter); Z.file('xl/workbook.xml',wb);
+    const blob=await Z.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    return {blob,name:`BOM_Connection_Type_${Nm.proj.replace(/\s+/g,'_')}_EN.xlsx`,over:R.over,overPlates:R.overPlates,miss:Ct.miss}; };
   AV._rd=rd; AV._g6=g6; AV._ftIn=ftIn;
 })(typeof window!=='undefined'?window:globalThis);

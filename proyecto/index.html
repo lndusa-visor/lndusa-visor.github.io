@@ -3041,7 +3041,7 @@ let bolts=null;
 function mergeBolts(list){ const by=new Map(), order=[];
   list.forEach(B=>B.rows.forEach(b=>{ const k=[b.sec,b.grade,b.dia,b.len,b.notes].join('|'); const o=by.get(k);
     if(o){ ['qty','hex','hh','hj','hhj','hd','bvl','dti'].forEach(c=>o[c]=(o[c]||0)+(b[c]||0)); } else { const n=Object.assign({},b); by.set(k,n); order.push(n); } }));
-  order.forEach((b,i)=>b.item=i+1); return {meta:list[0].meta,rows:order,fmt:list.every(B=>B.fmt==='ptp')?'ptp':''}; }
+  order.forEach((b,i)=>b.item=i+1); return {meta:list[0].meta,rows:order,fmt:list.every(B=>B.fmt==='ptp')?'ptp':'',list}; }
 async function loadBolts(fs){ fs=[].concat(fs).filter(Boolean); if(!fs.length) return;
   if(typeof XLSX==='undefined'){ $('boltInfo').innerHTML='<span style="color:var(--bad)">No se pudo cargar el lector de Excel.</span>'; return; }
   const ok=[], bad=[];
@@ -3627,6 +3627,7 @@ async function loadFiles(files){
   const p0=parseRaw(parts[0].aoa); const d=deriveCode(parts[0].f.name,p0&&p0.meta.bom); if(d){ $('code').value=d.code; $('short').value=d.short; }
   $('srcTag').textContent=parts.map(x=>x.f.name).join(' + ');
   load(aoa,'BOM',`${parts.length} BOM juntos (${parts.map(x=>esc(x.f.name)).join(', ')})`+(bad.length?` · no se pudo leer: ${esc(bad.join(', '))}`:''),units);
+  if(P&&P.units) P.units.forEach(u=>{ const q=parts.find(x=>x.f.name===u.file); if(q){ const r=parseRaw(q.aoa); u.meta=r&&r.meta; } });  // datos del BOM de cada unidad
 }
 // varios IFC (uno por unidad): se leen todos y se juntan (marcas, pernos, tipo de placa y forma 3D)
 function mergeIFC(list){ const out={marks:new Map(),nAsm:0,bolts:{Workshop:0,Site:0},plateType:new Map(),welds:true,schema:list[0].schema};
