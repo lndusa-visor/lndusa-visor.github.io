@@ -65,6 +65,9 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 - Peso y área unitarios (H, J de BOM CONNECTION; L de TAKEOFF; G, H de PAINTING) llevan los decimales del total del BOM; se ven redondeados por el formato de celda.
 - Suma de partes = 57378.7 lb (55 m) / 33897.3 lb (30 m). Suma de ensambles del BOM = 57378.9 / 33898.3. Esa diferencia ya viene dentro del BOM original.
 
+## Decisión sobre soldadura
+- El usuario decidió dejar la regla como está: no se ajusta por B6/B7/B9 ni VB2. Esas diferencias contra la referencia quedan aceptadas.
+
 ## Control de pruebas
 - Los troqueles de la columna Z de BOM CONNECTION no los pone el generador: los agrega el paso «Agregar al Excel de avance». Falta encadenarlo.
 
