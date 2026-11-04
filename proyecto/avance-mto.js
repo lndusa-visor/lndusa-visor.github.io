@@ -1,7 +1,7 @@
 /* Excel de avance — hojas de material: TAKEOFF BASE, MTO SUMMARY, PROFILE CUTTING PLAN, PLATE NESTING.
    Salen de las filas de partes de la hoja BOM … CONNECTION; se usa después de avance-gen.js (AV.sheetXml).
    Reglas comprobadas celda por celda con el Excel de 55 m:
-   - Barras: first-fit por largo descendente (a igual largo, orden del BOM); cada corte gasta kerf; recorte al final de barra.
+   - Barras: largo descendente (a igual largo, orden del BOM), cada pieza a la barra más justa donde quepa; cada corte gasta kerf; recorte al final de barra.
      Las barras con el mismo acomodo se listan juntas, primero los acomodos que más se repiten.
    - Placas: MaxRects por área descendente, Best Short Side Fit, primera lámina donde quepa, sin reordenar láminas. */
 (function(G){ 'use strict';
@@ -25,9 +25,9 @@
       if(t==='P'||t==='H') out.push({asm,mark:v('B'),qty:v('D'),desc:v('E'),grade:v('F'),len:ftIn(v('G')),wt:v('H')}); });
     return out; };
 
-  function firstFit(pieces,S,kerf,trim){ const bars=[]; pieces.forEach(p=>{ const need=p.len+kerf; let b=bars.find(x=>x.free>=need-1e-9); if(!b){ b={free:S-trim,items:[],used:0}; bars.push(b); } b.items.push(p); b.free-=need; b.used+=need; }); return bars; }
+  function bestFit(pieces,S,kerf,trim){ const bars=[]; pieces.forEach(p=>{ const need=p.len+kerf; let b=null; for(const x of bars) if(x.free>=need-1e-9&&(!b||x.free<b.free)) b=x; if(!b){ b={free:S-trim,items:[],used:0}; bars.push(b); } b.items.push(p); b.free-=need; b.used+=need; }); return bars; }
   function barText(b,asmOf){ const o=[]; b.items.forEach(p=>{ const x=o.find(i=>i.m===p.mark&&i.len===p.len); if(x) x.n++; else o.push({m:p.mark,len:p.len,n:1}); });
-    return o.map(i=>`${i.m} ${g6(i.len)}"${i.n>1?` ×${i.n}`:''} (${asmOf[i.m].join(' / ')})`).join(' · '); }
+    const str=(x,y)=>x<y?-1:x>y?1:0; o.sort((x,y)=>y.len-x.len||str(x.m,y.m)); return o.map(i=>`${i.m} ${g6(i.len)}"${i.n>1?` ×${i.n}`:''} (${asmOf[i.m].join(' / ')})`).join(' · '); }
   function groupBars(bars){ const count={}; bars.forEach(b=>count[b.txt]=(count[b.txt]||0)+1); const seen=new Map(); bars.forEach(b=>{ if(!seen.has(b.txt)) seen.set(b.txt,[]); seen.get(b.txt).push(b); });
     return [...seen.values()].map((l,i)=>({l,i})).sort((a,b)=>b.l.length-a.l.length||a.i-b.i).flatMap(x=>x.l); }
 
@@ -86,8 +86,8 @@
       [...merged.values()].forEach(m=>{ for(let q=0;q<m.qty;q++) pieces.push({mark:m.mark,len:m.len}); });
       const sorted=pieces.map((p,i)=>({p,i})).sort((a,b)=>b.p.len-a.p.len||a.i-b.i).map(x=>x.p);
       sorted.filter(p=>p.len+kerf>S*12-trim+1e-9).forEach(p=>over.push(p));
-      const bars=firstFit(sorted.filter(p=>p.len+kerf<=S*12-trim+1e-9),S*12,kerf,trim); bars.forEach(b=>{ b.txt=barText(b,asmOf); }); const list=groupBars(bars); const f=r;
-      list.forEach((b,i)=>{ const G=rd(b.used/12,3); b.G=G; pl.push({r,ht:'15',ch:false,cells:cells('A130 B10 C29 D133 E29 F160 G161 H161 I74 J75',{A:txt(g.desc),B:txt(g.grade),C:num(i+1),D:num(S),E:num(b.items.length),F:txt(b.txt),G:num(G),H:fx(`D${r}-G${r}`,S-G),I:fx(`IFERROR(G${r}/D${r},0)`,G/S),J:fx(`D${r}*${lf}`,S*lf)})}); r++; });
+      const bars=bestFit(sorted.filter(p=>p.len+kerf<=S*12-trim+1e-9),S*12,kerf,trim); bars.forEach(b=>{ b.txt=barText(b,asmOf); }); const list=groupBars(bars); const f=r;
+      list.forEach((b,i)=>{ const G=rd(b.used/12,3); b.G=G; pl.push({r,ht:b.txt.length>100?'22.35':'15',ch:false,cells:cells('A130 B10 C29 D133 E29 F160 G161 H161 I74 J75',{A:txt(g.desc),B:txt(g.grade),C:num(i+1),D:num(S),E:num(b.items.length),F:txt(b.txt),G:num(G),H:fx(`D${r}-G${r}`,S-G),I:fx(`IFERROR(G${r}/D${r},0)`,G/S),J:fx(`D${r}*${lf}`,S*lf)})}); r++; });
       const l=r-1, gs=list.reduce((t,b)=>t+b.G,0), cut=list.reduce((t,b)=>t+b.items.length,0), st=list.length*S;
       g.bars=list.length; g.subRow=r;
       pl.push({r,ht:'15',ch:false,cells:cells('A99 B69 C54 D69 E66 F69 G52 H52 I136 J55',{A:txt(`Subtotal ${g.desc} ${g.grade}`),C:fx(`COUNT(C${f}:C${l})`,list.length),E:fx(`SUM(E${f}:E${l})`,cut),G:fx(`SUM(G${f}:G${l})`,gs),H:fx(`SUM(H${f}:H${l})`,st-gs),I:fx(`IFERROR(G${r}/SUMPRODUCT(D${f}:D${l}),0)`,gs/st),J:fx(`SUM(J${f}:J${l})`,st*lf)})}); r++;
@@ -99,11 +99,11 @@
     const NH=['THICKNESS','GRADE','SHEET No.','SHEET SIZE','SHEET AREA (ft²)','No. PIECES','PIECES (part mark ×qty)','NET AREA (ft²)','YIELD','SHEET WEIGHT (lb)'];
     ns.push({r:4,ht:'31.5',ch:true,cells:'ABCDEFGHIJ'.split('').map((c,i)=>({c,s:5,v:NH[i]}))});
     r=5; const overP=[];
-    plates.forEach((g,gi)=>{ const merged=new Map(), pcs=[]; g.rows.forEach(p=>{ if(!merged.has(p.mark)) merged.set(p.mark,{mark:p.mark,len:p.len,w:p.d.w,qty:0}); merged.get(p.mark).qty+=p.qty; });
+    plates.forEach((g,gi)=>{ const merged=new Map(), pcs=[]; g.rows.forEach(p=>{ const k=p.mark+'|'+p.len+'|'+p.d.w; if(!merged.has(k)) merged.set(k,{mark:p.mark,len:p.len,w:p.d.w,qty:0}); merged.get(k).qty+=p.qty; });
       [...merged.values()].forEach(m=>{ const a=Math.max(m.len,m.w), b=Math.min(m.len,m.w); for(let q=0;q<m.qty;q++) pcs.push({mark:m.mark,a,b}); });
       const N=nest(pcs,sl*12-2*edge,sw*12-2*edge,gap); overP.push(...N.over); const f=r, wt=sA*40.84*g.t; let net=0, count=0;
-      N.bins.forEach((b,i)=>{ const c={}; b.items.forEach(p=>c[p.mark]=(c[p.mark]||0)+1); const t=Object.keys(c).sort(nat).map(k=>`${k} ×${c[k]}`).join(' · '), H=rd(b.area/144,2); net+=H; count+=b.items.length;
-        ns.push({r,ht:'15',ch:false,cells:cells('A130 B10 C29 D29 E133 F29 G160 H161 I74 J75',{A:txt(g.tok),B:txt(g.grade),C:num(i+1),D:txt(sTxt),E:num(sA),F:num(b.items.length),G:txt(t),H:num(H),I:fx(`IFERROR(H${r}/E${r},0)`,H/sA),J:fx(`E${r}*40.84*${g.t}`,wt)})}); r++; });
+      N.bins.forEach((b,i)=>{ const c={}; b.items.forEach(p=>c[p.mark]=(c[p.mark]||0)+1); const t=Object.keys(c).sort().map(k=>`${k} ×${c[k]}`).join(' · '), H=rd(b.area/144,2); net+=H; count+=b.items.length;
+        ns.push({r,ht:t.length>80?'22.35':'15',ch:false,cells:cells('A130 B10 C29 D29 E133 F29 G160 H161 I74 J75',{A:txt(g.tok),B:txt(g.grade),C:num(i+1),D:txt(sTxt),E:num(sA),F:num(b.items.length),G:txt(t),H:num(H),I:fx(`IFERROR(H${r}/E${r},0)`,H/sA),J:fx(`E${r}*40.84*${g.t}`,wt)})}); r++; });
       const l=r-1, nb=N.bins.length; g.sheets=nb; g.subRow=r;
       ns.push({r,ht:'15',ch:false,cells:cells('A99 B69 C54 D69 E55 F66 G69 H52 I136 J55',{A:txt(`Subtotal ${g.tok} ${g.grade}`),C:fx(`COUNT(C${f}:C${l})`,nb),E:fx(`SUM(E${f}:E${l})`,nb*sA),F:fx(`SUM(F${f}:F${l})`,count),H:fx(`SUM(H${f}:H${l})`,net),I:fx(`IFERROR(H${r}/E${r},0)`,net/(nb*sA)),J:fx(`SUM(J${f}:J${l})`,nb*wt)})}); r++;
       if(gi<plates.length-1) r++; });
@@ -143,7 +143,7 @@
   const LONGNAME=d=>{ const u=String(d).toUpperCase(); return /^W\d/.test(u)?'Wide flange beam':/^HSS/.test(u)?'Hollow structural section':/^(C|MC)\d/.test(u)?'Channel':/^L\d/.test(u)?'Equal-leg angle':/^PIPE/.test(u)?'Pipe':'Profile'; };
   AV.vendorSheets=function(o,R){ const VR='VENDOR REQUISITION', PO='PURCHASE ORDERS', rev=o.rev||'Rev 0', last=R.last, tb=c=>`'TAKEOFF BASE'!$${c}$5:$${c}$${last}`, po=c=>`'${PO}'!$${c}$8:$${c}$207`;
     const nf=x=>Number(x).toLocaleString('en-US'), pct=x=>Math.round(x*100), rows=[], merges=[], mats={}, sheet=o.sheet||[4,8], sw=Math.min(...sheet), sl=Math.max(...sheet), sTxt=`${sw}' x ${sl}'`, sA=sw*sl, spares=o.spares??0.05;
-    rows.push(noteRow(1,77,'MATERIAL REQUISITION TO VENDOR','18',true),noteRow(2,61,`${o.proj} – LINDSAYCA, Inc. – Ref. BOM ${o.bomDocFull||o.bomDoc} (${rev}) / Bolt Summary ${o.boltDocFull||o.boltDoc} (${rev})`));
+    rows.push(noteRow(1,77,'MATERIAL REQUISITION TO VENDOR','18',true),noteRow(2,61,`${o.proj} – LINDSAYCA, Inc. – Ref. BOM ${o.bomDocFull||o.bomDoc} (${rev}) / Bolt Summary ${o.boltDocFull||o.boltDoc} (${rev})${o.ptpDocFull?` / Point-to-Point Bolt List ${o.ptpDocFull} (${rev})`:''}`));
     const H4=(r,a,g,sI)=>({r,ht:'15',ch:false,cells:cells(`A70 B70 C102 D102 E102 G70 H70 I${sI} J${sI} K${sI}`,{A:txt(a),G:txt(g)})});
     rows.push(H4(4,'Requisition No.','Date',103),H4(5,'Requested by','Vendor',102),H4(6,'Delivery location','Required on-site date',103));
     rows.push({r:7,ht:'15',ch:false,cells:cells('A70 B70 C104 D59 N59',{A:txt('% bolt spares'),C:num(spares),D:txt('Bolt Summary states 0% added; adjust to purchasing policy.'),N:txt('Columns N–U: purchasing. SAP CODE and PR No. are typed here; vendors and POs are typed in PURCHASE ORDERS (one row per PO line, several vendors per item allowed).')})});
