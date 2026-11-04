@@ -119,6 +119,10 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 - Excel no rehace el plan al cambiar una celda: la elección va en la página, antes de generar.
 - MTO SUMMARY: columna N «LONGEST PIECE (PROJECT)», dato sin fórmula, de todo el proyecto. Las barras de cada unidad se calculan con sus piezas; el Plan de corte conjunto puede dar otro total.
 
+## Un solo botón
+- «Crear proyecto» (id avGen): valida token, deja el visor vivo, descarga el Excel por unidad y publica el tablero. Los pasos sueltos quedan en Opciones avanzadas.
+- El token va en Datos del proyecto. GitHub Pages cachea unos 10 minutos.
+
 ## Control de pruebas
 - Los troqueles de la columna Z de BOM CONNECTION no los pone el generador: los agrega el paso «Agregar al Excel de avance». Falta encadenarlo.
 

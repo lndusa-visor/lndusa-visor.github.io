@@ -136,6 +136,7 @@ details.sec>div{padding-top:10px;display:flex;flex-direction:column;gap:10px}
           <b>Datos del proyecto</b>
           <div class="field" style="margin-top:6px"><label class="hint" for="code">Código (arma el enlace del visor y de los QR)</label><input type="text" id="code" value="" placeholder="US.068.4" autocomplete="off"></div>
           <div class="field"><label class="hint" for="pname">Nombre del proyecto</label><input type="text" id="pname" value=""></div>
+          <div class="field"><label class="hint" for="ghToken">Token de GitHub (solo la primera vez en esta computadora)</label><input type="password" class="vis" id="ghToken" autocomplete="off" placeholder="github_pat_…" style="width:100%;box-sizing:border-box;padding:8px;font:inherit"></div>
           <div class="row" style="align-items:center;margin-top:4px"><span class="hint" id="codeHint" aria-live="polite">Escribe el código antes de generar los QR.</span><button type="button" class="ghost" id="codeOk" hidden>Confirmar código</button></div>
         </div>
         <div class="drop" id="dropParts" style="display:none">
@@ -155,17 +156,16 @@ details.sec>div{padding-top:10px;display:flex;flex-direction:column;gap:10px}
           <input type="text" class="vis" id="stLetter" maxlength="3" value="C" autocomplete="off" style="width:80px;padding:8px;font:inherit;text-transform:uppercase">
           <span class="hint" id="visorHint" aria-live="polite"></span>
           <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
+            <b>Crear proyecto</b>
+            <span class="hint">Con el BOM, el IFC y el Bolt Summary cargados, este botón hace todo: publica el visor, deja vivos los QR, descarga el Excel de avance de cada unidad y agrega el proyecto al tablero.</span>
+            <div id="matBox" style="margin-top:8px;overflow-x:auto"></div>
+            <div class="row" style="margin-top:8px;align-items:center"><div class="field" style="flex:0 1 170px"><label class="hint" for="avStart">Fecha de inicio</label><input type="date" class="vis" id="avStart"></div><button type="button" id="avGen">Crear proyecto</button><span class="hint" id="avGenInfo" aria-live="polite"></span></div>
+          </div>
+          <details style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><summary class="hint" style="cursor:pointer">Opciones avanzadas: publicar por separado o agregar a un Excel existente</summary>
+<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
             <b>Publicar visor en GitHub</b>
             <span class="hint">Arma el visor 3D con los IFC cargados y lo sube a <code>lndusa-visor.github.io/CÓDIGO/</code>. Los QR de la lista ya apuntan ahí. La primera vez pide el token de GitHub; queda guardado solo en esta computadora.</span>
-            <label class="hint" for="ghToken" style="margin-top:6px">Token de GitHub (github_pat_…)</label>
-            <input type="password" class="vis" id="ghToken" autocomplete="off" placeholder="github_pat_…" style="width:100%;box-sizing:border-box;padding:8px;font:inherit">
             <div class="row" style="margin-top:8px;align-items:center"><button type="button" id="ghPub">Publicar visor en GitHub</button><span class="hint" id="ghInfo" aria-live="polite"></span></div>
-          </div>
-          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
-            <b>Generar Excel de avance</b>
-            <span class="hint">Con el BOM, el IFC y el Bolt Summary cargados, arma el Excel de avance completo de cada unidad, con los troqueles y las pestañas LISTA DE TROQUELADOS, PR SAP y PLAN DE CORTE. Usa la tabla de materiales de aquí abajo y la lámina elegida en el optimizador.</span>
-            <div id="matBox" style="margin-top:8px;overflow-x:auto"></div>
-            <div class="row" style="margin-top:8px;align-items:center"><div class="field" style="flex:0 1 170px"><label class="hint" for="avStart">Fecha de inicio</label><input type="date" class="vis" id="avStart"></div><button type="button" id="avGen">Generar Excel de avance</button><span class="hint" id="avGenInfo" aria-live="polite"></span></div>
           </div>
           <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
             <b>Publicar en el tablero</b>
@@ -177,6 +177,7 @@ details.sec>div{padding-top:10px;display:flex;flex-direction:column;gap:10px}
             <span class="hint">Elige el Excel de avance (BOM_Connection_Type) de cada unidad. Sale una copia con los troqueles en la columna Piece Die Stamp (la letra arriba de «PIECE DIE STAMP (BOM)» en Welding Progress) y las pestañas nuevas LISTA DE TROQUELADOS, PR SAP y PLAN DE CORTE. Lo demás del Excel no se toca.</span>
             <div class="row" style="margin-top:8px;align-items:center"><label class="ghost" style="cursor:pointer;display:inline-block;padding:8px 12px;border:1px solid var(--line)">Elegir Excel de avance<input type="file" id="avFile" accept=".xlsx,.xlsm" multiple hidden></label><span class="hint" id="avInfo" aria-live="polite"></span></div>
           </div>
+          </details>
         </div>
       </div>
       <div class="group">
@@ -4375,6 +4376,7 @@ load(RAW_SAMPLE,'BESS Area PDC and Transformer','Ejemplo: BESS Assembly List BOM
     if(typeof P==='undefined'||!P||!book){ info('Primero carga los BOM.'); return; }
     if(typeof ifc==='undefined'||!ifc||typeof asmGeo==='undefined'||!asmGeo.size){ info('Falta el IFC.'); return; }
     if(typeof bolts==='undefined'||!bolts){ info('Falta el Bolt Summary.'); return; }
+    const tkE=$i('ghToken'), token=(tkE&&tkE.value||'').trim(); if(!token){ info('Pega el token de GitHub en Datos del proyecto.'); if(tkE){ tkE.scrollIntoView({block:'center'}); tkE.focus(); } return; } try{ localStorage.setItem('gh.token',token); }catch(e){}
     btn.disabled=true; if(!(await window.ensureVisorLive(info))) return; info('Preparando…');
     const [tR,jR]=await Promise.all([fetch('avance-plantilla.xlsx',{cache:'no-store'}),fetch('avance-tpl-bom.json',{cache:'no-store'})]); if(!tR.ok||!jR.ok) throw new Error('No pude leer la plantilla del Excel.');
     const tpl=await tR.arrayBuffer(), bt=await jR.json(), stock={}; let free=[];
@@ -4384,8 +4386,9 @@ load(RAW_SAMPLE,'BESS Area PDC and Transformer','Ejemplo: BESS Assembly List BOM
     for(const u of units){ info(`Generando ${u||'el proyecto'}…`); const G=await AV.generate(tpl.slice(0),bt,{unit:u,stock,sheet,startDate:st.value||new Date().toISOString().slice(0,10),kerf:(+$i('kerf').value||0.125),trim:(+$i('trim').value||0.5),gap:(+$i('plGap').value||0.25),edge:(+$i('plEdge').value||0.5)});
       if(G.over.length||G.overPlates.length||G.miss.length) over.push(`${u||'proyecto'}: ${G.over.length+G.overPlates.length} piezas no caben en barra o lámina${G.miss.length?` · ${G.miss.length} materiales sin fila`:''}`);
       await addToAvance(new File([G.blob],G.name),info); n++; }
-    info(`Listo: ${n} Excel de avance descargado${n>1?'s':''}.${over.length?' Revisa: '+over.join(' · '):''}`);
-  }catch(e){ console.error(e); info('No se pudo generar: '+(e&&e.message||e)); } finally{ btn.disabled=false; } });
+    info('Agregando el proyecto al tablero…'); const T=await AV.publishTablero({code:($i('code').value||'').trim(),name:($i('pname').value||'').trim(),token,ifcNames:(window.__ifcFiles||[]).map(f=>f.name),onProgress:info}), w=[...over,...T.warn];
+    info(`Listo: ${n} Excel de avance descargado${n>1?'s':''}, visor con QR vivos y proyecto agregado al tablero (GitHub tarda 1–2 minutos en mostrarlo).${w.length?' Revisa: '+w.join(' · '):''}`);
+  }catch(e){ console.error(e); info((e&&e.status===401?'El token no sirve o venció. ':'')+'No se pudo terminar: '+(e&&e.message||e)); } finally{ btn.disabled=false; } });
 })();
 </script>
 </body></html>
