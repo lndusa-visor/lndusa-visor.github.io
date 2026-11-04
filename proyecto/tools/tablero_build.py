@@ -38,11 +38,27 @@ PANEL = r"""<div id="np-box" style="display:none;position:fixed;inset:0;z-index:
   const box=$('np-box'); $('h-new').onclick=()=>{ const f=$('np-frame'); if(!f.src) f.src='https://lndusa-visor.github.io/proyecto/?v='+Date.now(); box.style.display='grid'; }; $('np-close').onclick=()=>{ box.style.display='none'; lists(); };
   $('np-title').textContent='Nuevo proyecto'; fill(); ['lang-en','lang-es'].forEach(i=>{ const b=$(i); if(b) b.addEventListener('click',()=>setTimeout(fill,0)); }); lists(); })();
 </script>"""
-if EMBED:
+VIRGEN = '--virgen' in sys.argv   # sin proyectos adentro: mismo archivo para cualquier proyecto; si el nombre lleva el código (US.071.1), abre ese
+TB_VIRGEN = r"""const TB = (function(){ const base = 'https://lndusa-visor.github.io/tablero-datos/', NP = 'https://lndusa-visor.github.io/proyecto/', get = u => { const r = new XMLHttpRequest(); r.open('GET', u+'?v='+Date.now(), false); r.send(); if(r.status!==200) throw new Error(u+' · '+r.status); return JSON.parse(r.responseText); }, E = t => String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const home = (msg, list) => { document.documentElement.innerHTML = `<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tablero de avance</title><style>:root{--bg:#f3f4f2;--ink:#1d2326;--card:#fff;--line:#d5dbdf;--acc:#1f5fa8}@media (prefers-color-scheme:dark){:root{--bg:#15191b;--ink:#e8ecee;--card:#1f2528;--line:#33393d;--acc:#6ea8e6}}body{margin:0;padding:32px 16px;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,sans-serif}main{max-width:620px;margin:0 auto}h1{margin:0 0 6px;font-size:26px}p{margin:0 0 18px}.b{display:inline-block;margin:0 0 18px;padding:11px 16px;border:0;border-radius:5px;background:var(--acc);color:#fff;font:600 15px system-ui,sans-serif;cursor:pointer}a.p{display:block;margin:0 0 8px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:5px;color:inherit;text-decoration:none}a.p b{display:block}a.p span{font-size:14px;opacity:.75}#n{display:none;position:fixed;inset:0;background:var(--bg);grid-template-rows:auto minmax(0,1fr)}#n div{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:2px solid var(--acc)}#n iframe{width:100%;height:100%;border:0}#n button{padding:6px 12px;cursor:pointer}</style></head><body><main><h1>Tablero de avance</h1><p>${E(msg)}</p><button class="b" id="o" type="button">＋ Nuevo proyecto</button>${list.map(p=>`<a class="p" href="?g=${encodeURIComponent(p.code)}"><b>${E(p.code)}</b><span>${E(p.name||p.title||'')}</span></a>`).join('')}</main><div id="n"><div><b>Nuevo proyecto</b><button id="c" type="button">✕</button></div><iframe id="f" title="Nuevo proyecto"></iframe></div></body>`;
+    const $ = i => document.getElementById(i); $('o').onclick = () => { const f=$('f'); if(!f.src) f.src=NP+'?v='+Date.now(); $('n').style.display='grid'; }; $('c').onclick = () => location.reload(); throw new Error('Elegir proyecto'); };
+  let L = null; try{ L = get(base+'index.json'); }catch(e){ home('No pude leer los proyectos. Revisa la conexión a internet.', []); }
+  const list = (L.proyectos||[]).slice(), q = new URLSearchParams(location.search).get('g'), nm = decodeURIComponent(location.pathname.split('/').pop()||'').match(/US[._ -]?\d{3}[._ -]\d+/i), code = q || (nm && nm[0].toUpperCase().replace(/[_ -]/g,'.')), cur = list.find(p=>p.code===code);
+  if(!cur) home(list.length ? 'Elige un proyecto o crea uno nuevo.' : 'Todavía no hay proyectos. Crea el primero.', list);
+  let meta = null; try{ meta = get(base+encodeURIComponent(cur.folder)+'/proyecto.json'); }catch(e){ home('No pude leer el proyecto '+cur.code+'.', list); }
+  return {list, cur, base, title:meta.title, projs:meta.projs, keys:meta.keys, scene:k=>{ try{ return get(base+encodeURIComponent(cur.folder)+'/'+encodeURIComponent(k)+'.json'); }catch(e){ home('No pude leer el 3D de '+cur.code+'.', list); } }}; })();
+const PROJS = TB.projs;
+const PKEYS = TB.keys;"""
+if EMBED or VIRGEN:
     lines = s.split('\n')
-    ix = [i for i, l in enumerate(lines) if l.startswith('const PKEYS =')]
-    if len(ix) != 1: sys.exit('No encontré PKEYS')
-    lines[ix[0]] = TB_EMBED
+    if VIRGEN:
+        ix = [i for i, l in enumerate(lines) if l.startswith('const SCENES = {')]
+        if len(ix) != 1 or not lines[ix[0]+1].startswith('const PROJS = {') or not lines[ix[0]+2].startswith('const PKEYS ='): sys.exit('No encontré SCENES / PROJS / PKEYS')
+        lines[ix[0]:ix[0]+3] = [TB_VIRGEN]
+    else:
+        ix = [i for i, l in enumerate(lines) if l.startswith('const PKEYS =')]
+        if len(ix) != 1: sys.exit('No encontré PKEYS')
+        lines[ix[0]] = TB_EMBED
     s = '\n'.join(lines)
     R("let PROJ = (location.hash.match(/p=(w55|w30|all)/)||[])[1] || lsGet('wtp-proj') || 'w55'; if(!['w55','w30','all'].includes(PROJ)) PROJ = 'w55';",
       "let PROJ = decodeURIComponent((location.hash.match(/p=([^&]+)/)||[])[1]||'') || lsGet('wtp-proj') || PKEYS[0]; if(![...PKEYS,'all'].includes(PROJ)) PROJ = PKEYS[0];")
@@ -57,8 +73,9 @@ if EMBED:
       '<div class="hrow"><label class="vsel" id="grpbox" hidden><span id="grplb"></span><select id="grpsel"></select></label><label class="vsel"><span data-i="pSel"></span><select id="projsel"></select></label><button class="hload" id="h-new" type="button"><span>＋</span> <span id="h-newt"></span></button>')
     k = s.rindex('</script>') + len('</script>')
     s = s[:k] + '\n' + PANEL + s[k:]
+    if VIRGEN: R('<title>PDC Piperacks Weld Map</title>', '<title>Tablero de avance</title>')
     open(out, 'w', encoding='utf8').write(s)
-    print('ok embed', len(s)); sys.exit(0)
+    print('ok', 'virgen' if VIRGEN else 'embed', len(s)); sys.exit(0)
 
 lines = s.split('\n')
 ix = [i for i, l in enumerate(lines) if l.startswith('const SCENES = {')]
