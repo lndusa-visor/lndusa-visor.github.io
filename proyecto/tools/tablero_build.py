@@ -5,6 +5,7 @@ El original no se toca. La copia no lleva proyectos adentro: los lee de ../table
 Cada cambio exige encontrar su texto exacto una sola vez; si el tablero cambia, se detiene."""
 import re, sys
 src, out = sys.argv[1], sys.argv[2]
+EMBED = '--embed' in sys.argv   # el HTML del compañero con sus proyectos adentro + «Nuevo proyecto» en un panel; los proyectos nuevos se leen de GitHub
 s = open(src, encoding='utf8').read()
 def R(a, b):
     global s
@@ -21,6 +22,43 @@ LOADER = r"""const TB = (function(){ const base = '../tablero-datos/', get = u =
   return {list, cur, title:meta.title, projs:meta.projs, keys:meta.keys, scene:k=>{ try{ return get(base+encodeURIComponent(cur.folder)+'/'+encodeURIComponent(k)+'.json'); }catch(e){ stop('No pude leer el 3D de '+cur.code+'.'); } }}; })();
 const PROJS = TB.projs;
 const PKEYS = TB.keys;"""
+
+TB_EMBED = r"""const TB = (function(){ const base = 'https://lndusa-visor.github.io/tablero-datos/', q = new URLSearchParams(location.search).get('g'), local = {code:'US.068.4', title:'US.068.4 - PDC Piperacks · WTS 55 m & WWTP 30 m'};
+  PROJS.w55.sheet = 'BOM WTS-55M - CONNECTION'; PROJS.w30.sheet = 'BOM WWTP-30M - CONNECTION';
+  const get = u => { const r = new XMLHttpRequest(); r.open('GET', u+'?v='+Date.now(), false); r.send(); if(r.status!==200) throw new Error(u+' · '+r.status); return JSON.parse(r.responseText); };
+  if(q && q!==local.code){ try{ const f = q.replace(/[^A-Za-z0-9._-]+/g,'_'), m = get(base+encodeURIComponent(f)+'/proyecto.json'); Object.assign(PROJS, m.projs); return {list:[local,{code:q}], cur:{code:q}, title:m.title, keys:m.keys, base, scene:k=>get(base+encodeURIComponent(f)+'/'+encodeURIComponent(k)+'.json')}; }catch(e){ console.warn('proyecto',e); } }
+  return {list:[local], cur:local, title:local.title, keys:['w55','w30'], base, scene:k=>SCENES[k]}; })();
+const PKEYS = TB.keys;"""
+PANEL = r"""<div id="np-box" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--bg,#fff);grid-template-rows:auto minmax(0,1fr)"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 14px;border-bottom:2px solid var(--brand,#1f5fa8)"><b id="np-title" style="font-size:15px"></b><button id="np-close" type="button" class="hload">✕</button></div><iframe id="np-frame" title="Nuevo proyecto" style="width:100%;height:100%;border:0"></iframe></div>
+<script id="nuevo-proyecto">
+/* ===== Agregado: «Nuevo proyecto» dentro del tablero. No cambia las pestañas: abre la carga de BOM, IFC y pernos en un panel y agrega los proyectos publicados al selector. ===== */
+(function(){ const L=(es,en)=>LANG==='es'?es:en, $=id=>document.getElementById(id), fill=()=>{ const gp=$('grpsel'), gb=$('grpbox'), nw=$('h-newt'), gl=$('grplb'); if(nw) nw.textContent=L('Nuevo proyecto','New project'); if(gl) gl.textContent=L('Contrato','Contract'); if(!gp) return; gp.innerHTML=TB.list.map(p=>`<option value="${String(p.code).replace(/"/g,'&quot;')}">${p.code}</option>`).join(''); gp.value=TB.cur.code; gb.hidden=TB.list.length<2; };
+  const lists=()=>fetch(TB.base+'index.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{ if(!j) return; const seen=new Set(TB.list.map(p=>p.code)); (j.proyectos||[]).forEach(p=>{ if(!seen.has(p.code)){ TB.list.push({code:p.code}); seen.add(p.code); } }); fill(); }).catch(()=>{});
+  $('grpsel').onchange=e=>{ location.href=location.pathname+'?g='+encodeURIComponent(e.target.value); };
+  const box=$('np-box'); $('h-new').onclick=()=>{ const f=$('np-frame'); if(!f.src) f.src='https://lndusa-visor.github.io/proyecto/'; box.style.display='grid'; }; $('np-close').onclick=()=>{ box.style.display='none'; lists(); };
+  $('np-title').textContent='Nuevo proyecto'; fill(); ['lang-en','lang-es'].forEach(i=>{ const b=$(i); if(b) b.addEventListener('click',()=>setTimeout(fill,0)); }); lists(); })();
+</script>"""
+if EMBED:
+    lines = s.split('\n')
+    ix = [i for i, l in enumerate(lines) if l.startswith('const PKEYS =')]
+    if len(ix) != 1: sys.exit('No encontré PKEYS')
+    lines[ix[0]] = TB_EMBED
+    s = '\n'.join(lines)
+    R("let PROJ = (location.hash.match(/p=(w55|w30|all)/)||[])[1] || lsGet('wtp-proj') || 'w55'; if(!['w55','w30','all'].includes(PROJ)) PROJ = 'w55';",
+      "let PROJ = decodeURIComponent((location.hash.match(/p=([^&]+)/)||[])[1]||'') || lsGet('wtp-proj') || PKEYS[0]; if(![...PKEYS,'all'].includes(PROJ)) PROJ = PKEYS[0];")
+    R("const PSC = ALLV ? (PKEYS.includes(lsGet('wtp-last')) ? lsGet('wtp-last') : 'w55') : PROJ;", "const PSC = ALLV ? (PKEYS.includes(lsGet('wtp-last')) ? lsGet('wtp-last') : PKEYS[0]) : PROJ;")
+    R("const SCENE = SCENES[PSC], PM = PROJS[PSC];", "const SCENE = TB.scene(PSC), PM = PROJS[PSC];")
+    R("I18N[l].title = 'US.068.4 - PDC Piperacks · WTS 55 m & WWTP 30 m'; Object.assign", "I18N[l].title = TB.title; Object.assign")
+    R("Object.assign(I18N.en, {sumH1:'US.068.4 - PDC Piperacks · WTS 55 m & WWTP 30 m', pSel:'Project', pAll:'Summary · 2 projects', sumTitle:'Summary of the 2 projects',", "Object.assign(I18N.en, {sumH1:TB.title, pSel:'Project', pAll:`Summary · ${PKEYS.length} projects`, sumTitle:`Summary of the ${PKEYS.length} projects`,")
+    R("Object.assign(I18N.es, {sumH1:'US.068.4 - PDC Piperacks · WTS 55 m & WWTP 30 m', pSel:'Proyecto', pAll:'Resumen · 2 proyectos', sumTitle:'Resumen de los 2 proyectos',", "Object.assign(I18N.es, {sumH1:TB.title, pSel:'Proyecto', pAll:`Resumen · ${PKEYS.length} proyectos`, sumTitle:`Resumen de los ${PKEYS.length} proyectos`,")
+    R("const proj = wb.SheetNames.includes('BOM WTS-55M - CONNECTION') ? 'w55' : wb.SheetNames.includes('BOM WWTP-30M - CONNECTION') ? 'w30' : null;", "const proj = PKEYS.find(k=>wb.SheetNames.includes(PROJS[k].sheet)) || null;")
+    R("const markKey = s => { const m = String(s||'').toUpperCase().match(/(?:WTS|WWTP)-[A-Z0-9]+/);", "const markKey = s => { const m = String(s||'').toUpperCase().match(/[A-Z0-9]+[-_][A-Z0-9]+/);")
+    R('<div class="hrow"><label class="vsel"><span data-i="pSel"></span><select id="projsel"></select></label>',
+      '<div class="hrow"><label class="vsel" id="grpbox" hidden><span id="grplb"></span><select id="grpsel"></select></label><label class="vsel"><span data-i="pSel"></span><select id="projsel"></select></label><button class="hload" id="h-new" type="button"><span>＋</span> <span id="h-newt"></span></button>')
+    k = s.rindex('</script>') + len('</script>')
+    s = s[:k] + '\n' + PANEL + s[k:]
+    open(out, 'w', encoding='utf8').write(s)
+    print('ok embed', len(s)); sys.exit(0)
 
 lines = s.split('\n')
 ix = [i for i, l in enumerate(lines) if l.startswith('const SCENES = {')]
