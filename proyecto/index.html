@@ -104,6 +104,7 @@ details.sec>div{padding-top:10px;display:flex;flex-direction:column;gap:10px}
   <header>
     <div>
       <h1>Nuevo proyecto · BOM, IFC y pernos</h1>
+      <span class="hint" id="appVer">Versión 12</span>
       <p class="sub">Carga el BOM tal como sale de Tekla y descarga cuatro Excel: <b>BOM trabajado</b> (BOM, compra, placas y pernos), <b>PR para SAP</b>, <b>Lista de troquelados</b> (piezas principales con su troquel y su QR al visor 3D) y <b>Plan de corte</b> (del Optimizador de cortes, al final de la página). Con varias unidades, la compra y el corte van juntos y los troquelados por unidad.</p>
     </div>
     <span class="tag" id="srcTag">Ejemplo: BOM US068.1</span>
@@ -152,8 +153,6 @@ details.sec>div{padding-top:10px;display:flex;flex-direction:column;gap:10px}
           <span class="hint">La Lista de troquelados lleva un QR por pieza (1 de N; ángulos, shims, arandelas y shear plates uno solo) que abre el visor 3D en cualquier teléfono. Déjalo vacío para usar el visor del proyecto en GitHub (lndusa-visor.github.io/CÓDIGO/).</span>
           <label class="hint" for="visorIn" style="margin-top:6px">Enlace del Visor de piezas</label>
           <input type="url" class="vis" id="visorIn" placeholder="(vacío = https://lndusa-visor.github.io/CÓDIGO/)" autocomplete="off" style="width:100%;box-sizing:border-box;padding:8px;font:inherit">
-          <label class="hint" for="stLetter" style="margin-top:8px">Letra del troquel (C1, C2, C3… en todo el proyecto)</label>
-          <input type="text" class="vis" id="stLetter" maxlength="3" value="C" autocomplete="off" style="width:80px;padding:8px;font:inherit;text-transform:uppercase">
           <span class="hint" id="visorHint" aria-live="polite"></span>
           <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
             <b>Crear proyecto</b>
@@ -256,11 +255,11 @@ details.sec>div{padding-top:10px;display:flex;flex-direction:column;gap:10px}
         <div class="asmgroups" id="gusGroups"></div>
       </details>
 
-      <details class="sec" open style="display:none">
+      <details class="sec" open>
         <summary><h2>Números de troquel</h2><span class="hint" id="stHint">Un número por marca: si hay 10 piezas iguales llevan el mismo troquel. Sale en la columna STAMP y dentro del QR.</span></summary>
         <div>
           <div class="row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
-            <label class="hint" for="stLetter">Letra inicial</label><input id="stLetter" maxlength="3" value="B" style="width:56px;padding:6px;font:inherit;text-transform:uppercase">
+            <label class="hint" for="stLetter">Letra inicial</label><input id="stLetter" maxlength="3" value="C" style="width:56px;padding:6px;font:inherit;text-transform:uppercase">
             <button class="ghost" type="button" id="stAuto" title="Numera solo las piezas principales sin troquel, en el orden de la lista, siguiendo después del número más alto de esa letra">Numerar las vacías</button>
             <input type="hidden" id="stScope" value="main">
             <button class="ghost" type="button" id="stClear">Borrar todos</button>
@@ -2647,8 +2646,10 @@ function buildBook(P,opt){
     profs.forEach(p=>{ const L=tqLines(inU(p.rows,u),()=>p.prof,r=>r.asm&&isMainRow(r)?tipoName(r.asm.desc):(/^L\s*\d/i.test(p.prof)?'Clip Angle':p.tipo),u); if(L.length) blocks.push({unit:u,title:uT(u,p.prof),mat:p.prof,lines:L}); });
     ths.forEach(g=>{ const L=tqLines(inU(g.rows,u),r=>r.descSp||r.desc,plTipo,u); if(L.length) blocks.push({unit:u,title:uT(u,'PLATE '+g.tok),mat:'PLATE '+g.tok,lines:L}); }); });
   // troqueles: consecutivos en todo el proyecto (un número por marca); piezas chicas = nombre de la marca
-  let stN=0; blocks.forEach(b=>b.lines.forEach(x=>{ const man=stampOf((x.unit?x.unit+' · ':'')+x.am);
-    x.st=x.small?shortMark(x.mark).toUpperCase():(man||(LET+(++stN))); }));
+  const usedSt=new Set(); blocks.forEach(b=>b.lines.forEach(x=>{ const m=stampOf((x.unit?x.unit+' · ':'')+x.am); if(m) usedSt.add(String(m).toUpperCase()); }));   // el automático no repite un número puesto a mano
+  let stN=0; const nextSt=()=>{ do{ stN++; }while(usedSt.has(LET+stN)); return LET+stN; }; const seenSt=new Map();
+  blocks.forEach(b=>b.lines.forEach(x=>{ const key=(x.unit?x.unit+' · ':'')+x.am, man=stampOf(key); x.st=x.small?shortMark(x.mark).toUpperCase():(man||nextSt()); if(!opt.onlyUnit){ if(!seenSt.has(key)) seenSt.set(key,{key,main:true,small:!!x.small,qty:0,desc:x.desc,cls:x.c,tipo:x.tipo,mat:b.mat,auto:x.st}); seenSt.get(key).qty+=x.qty; } }));
+  if(!opt.onlyUnit) window.__tqList=[...seenSt.values()];
   if(opt.onlyUnit){ const keep=blocks.filter(b=>b.unit===opt.onlyUnit); blocks.length=0; keep.forEach(b=>blocks.push(b)); }
   const vurl=visorURL();
   const HQ=['STAMP','PIEZA','S.NO.','MARK','QTY.','DESCRIPTION','SIMPLE/COMPU','TIPO','COATING','LENGTH','WEIGHT (lb)','SURFACE (ft²)','DRAWING'].concat(vurl?['QR']:[]).map(v=>({v,s:'h'}));
@@ -3831,15 +3832,13 @@ function renderGus(){
 function renderStamps(){
   stampOf('');
   // filas de la lista de troquelados (una por marca; las principales primero en el orden de la lista)
-  const seen=new Map();
-  (book?book.sheets.filter(s=>s.tq):[]).forEach(s=>s.aoa.forEach(r=>{ if(!r||!r.meta) return; const m=r.meta; if(!seen.has(m.key)) seen.set(m.key,{key:m.key,main:m.main,qty:0,desc:m.desc,cls:m.cls,tipo:m.tipo,mat:s.name.replace(/ TQ$/,'')}); const x=seen.get(m.key); x.qty+=m.qty; x.main=x.main||m.main; }));
-  const all=[...seen.values()], mains=all.filter(x=>x.main), others=all.filter(x=>!x.main);
+  const all=(window.__tqList||[]).filter(x=>!x.small), mains=all, others=[];
   const q=($('stFilter').value||'').trim().toUpperCase();
-  const show=x=>!q||x.key.toUpperCase().includes(q)||String(stamps[x.key]||'').toUpperCase().includes(q)||x.mat.toUpperCase().includes(q);
-  const n=mains.filter(x=>stamps[x.key]).length, no=others.filter(x=>stamps[x.key]).length;
+  const show=x=>!q||x.key.toUpperCase().includes(q)||String(stamps[x.key]||x.auto||'').toUpperCase().includes(q)||x.mat.toUpperCase().includes(q);
+  const n=mains.length, no=0;
   const pq=mains.reduce((s,x)=>s+x.qty,0);
   $('stHint').textContent=`Piezas principales (líneas amarillas): ${pq} piezas en ${mains.length} marcas, ${n} con troquel${no?` · ${no} partes soldadas con troquel`:''}. Un troquel por marca: las piezas iguales llevan el mismo número. Solo sale en la Lista de troquelados (columna STAMP y QR).`;
-  const tr=x=>`<tr${x.main?'':' class="sec2"'}><td><input data-st="${esc(x.key)}" value="${esc(stamps[x.key]||'')}" style="width:80px;padding:4px 6px;font:inherit" aria-label="Troquel de ${esc(x.key)}"></td><td><button class="ghost" type="button" data-nm="${esc(x.key)}" title="Poner como troquel el nombre de la pieza (${esc(shortMark(x.key))})">Nombre</button></td><td>${esc(x.key)}</td><td>${x.qty}</td><td>${esc(x.mat)}</td><td>${esc(x.main?x.cls:'Parte soldada')}${x.tipo==='Gusset'?' · <b>Gusset</b>':''}</td></tr>`;
+  const tr=x=>`<tr${x.main?'':' class="sec2"'}><td><input data-st="${esc(x.key)}" value="${esc(stamps[x.key]||'')}" placeholder="${esc(x.auto||'')}" style="width:80px;padding:4px 6px;font:inherit" aria-label="Troquel de ${esc(x.key)}"></td><td><button class="ghost" type="button" data-nm="${esc(x.key)}" title="Poner como troquel el nombre de la pieza (${esc(shortMark(x.key))})">Nombre</button></td><td>${esc(x.key)}</td><td>${x.qty}</td><td>${esc(x.mat)}</td><td>${esc(x.main?x.cls:'Parte soldada')}${x.tipo==='Gusset'?' · <b>Gusset</b>':''}</td></tr>`;
   const sm=mains.filter(show), so=others.filter(show);
   $('stTable').innerHTML='<thead><tr><th>Troquel</th><th></th><th>Marca</th><th>Cant.</th><th>Material</th><th>Tipo</th></tr></thead><tbody>'
     +(sm.length?`<tr><td colspan="6"><b>Piezas principales</b> (${sm.length})</td></tr>`+sm.map(tr).join(''):'')
