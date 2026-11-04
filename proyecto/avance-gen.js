@@ -82,7 +82,7 @@
       const ifcOrder=A?A.members.map(m=>normMark(m.mark)):[];
       const parts=a.parts.map(r=>{ const k=normMark(r.mark); const role=ROLE[(names.get&&names.get(r.mark.toUpperCase()))||(names.get&&names.get(k))||'']||(r.kind==='plate'?'plate':/^W/i.test(r.D||'')?'welded beam stub':'part');
         const t=r.t||0; const fil=role==='base plate'&&t>=1?'5/16"':'1/4"';
-        return {r,k,main:r===a.main,welded:welded.has(k)&&r!==a.main,loose:looseMarks.has(k),role,fillet:fil,weld:weldIn.get(k)||0,weldN:weldN.get(k)||0,li:looseInfo.get(k)||null}; });
+        return {r,k,ptype:(names.get&&(names.get(r.mark.toUpperCase())||names.get(k)))||'',main:r===a.main,welded:welded.has(k)&&r!==a.main,loose:looseMarks.has(k),role,fillet:fil,weld:weldIn.get(k)||0,weldN:weldN.get(k)||0,li:looseInfo.get(k)||null}; });
       const nodes=comp?(a.qty>1?`${node+1}–${node+a.qty}`:String(node+1)):'—'; if(comp) node+=a.qty;
       out.push({a,comp,parts,nodes,perInst,anchors,to:[...to].sort(natCmp),spec:boltSpec,ifcOrder,weldSeq}); });
     return out; };
@@ -118,7 +118,7 @@
     // encabezados (filas 1–3) de la plantilla; el título con el proyecto
     ['h1','h2','h3'].forEach((k,i)=>{ const cells=T[k].c.map(c=>({c:c[0],s:c[1],v:c[2]!=null?(k==='h1'&&c[0]==='A'?o.title:c[2]):null})); rows.push({r:i+1,ht:T[k].ht,ch:T[k].ch,cells}); });
     const R1=[],V1=[], groups=[]; let nAsm=0, nPieces=0; const looseNotes=[];
-    const W=n=>Math.round(n*10)/10, round2=n=>Math.round(n*100)/100;
+    const W=n=>Math.round(n*10)/10, round2=n=>Math.round(n*100)/100; const exact=n=>+n.toFixed(8);
     const spec=(M[0]&&M[0].spec)||{grade:'A325N',dia:'3/4"'}; const bTxt=(n,to,an,na)=>n?`Bolted ${spec.grade} Ø${spec.dia} ×${n}`+(to.length?` · to ${to.join(', ')}`:'')+(na&&an?` · anchored ${an.grade} Ø${an.dia} ×${na}`:''):(na&&an?`Anchored ${an.grade} Ø${an.dia} ×${na}`:'—');
     M.forEach(x=>{ const a=x.a, main=x.parts.find(p=>p.main)||x.parts[0]; if(!main) return; nAsm++; nPieces+=a.qty;
       const wp=x.parts.filter(p=>p.welded).sort((p,q)=>natCmp(p.r.mark,q.r.mark)), hp=x.parts.filter(p=>p.loose).sort((p,q)=>natCmp(p.r.mark,q.r.mark));
@@ -128,7 +128,8 @@
       wp.forEach(p=>{ const t=p.role==='welded beam stub'?'welded beam':p.role; if(!roles.includes(t)) roles.push(t); });
       const lq=looseQty?` · ${looseQty} non-welded parts counted as LOOSE pieces`:'';
       const O=x.comp?`Shop welded (fillet): ${roles.join(', ')}${lq}`:`No welding${lq}`;
-      const sumI=[main,...wp,...hp].reduce((t,p)=>t+W(p.r.qty*p.r.pwt),0), sumK=[main,...wp,...hp].reduce((t,p)=>t+round2(p.r.qty*p.r.sa1),0), sumIP=[main,...wp].reduce((t,p)=>t+W(p.r.qty*p.r.pwt),0);
+      // el BOM manda: las fórmulas no cambian; el dato unitario lleva los decimales del total del BOM (se ve igual en la hoja)
+      const rowT=q=>q.twt!=null?q.twt:q.qty*q.pwt, rowS=q=>q.saAll!=null?q.saAll:q.qty*q.sa1, sumI=[main,...wp,...hp].reduce((t,p)=>t+W(rowT(p.r)),0), sumK=[main,...wp,...hp].reduce((t,p)=>t+round2(rowS(p.r)),0), sumIP=[main,...wp].reduce((t,p)=>t+W(rowT(p.r)),0);
       const sumAQ=wp.reduce((t,p)=>t+W(p.weld),0);
       add(x.comp?'AC':'AL',{A:{v:a.sno},B:{v:a.mark},D:{v:a.qty},E:{v:a.desc||''},G:{v:(a.row&&a.row.lenText)||''},
         H:{f:`ROUND(SUM(I${p0}:I${pl})/D${rA},1)`,v:W(sumI/a.qty)},I:{f:`SUM(I${p0}:I${pl})`,v:W(sumI)},J:{f:`ROUND(K${rA}/D${rA},2)`,v:round2(sumK/a.qty)},K:{f:`SUM(K${p0}:K${pl})`,v:round2(sumK)},
@@ -138,7 +139,7 @@
         AH:{f:`'DAILY REPORT'!$C$5*AF${rA}+'DAILY REPORT'!$C$6*AG${rA}`,v:0},AI:{f:`ROUNDDOWN(D${rA}*MIN(AF${rA},AG${rA})+0.0001,0)`,v:0},AJ:{f:`IFERROR(AD${rA}/$I$@TOT@,0)`,v:0},AK:{f:`IFERROR(AE${rA}/$I$@TOT@,0)`,v:0},
         AL:{f:`'DAILY REPORT'!$C$5*AJ${rA}`,v:0},AM:{f:`'DAILY REPORT'!$C$6*AK${rA}`,v:0},AN:{f:`AL${rA}+AM${rA}`,v:0},AO:{v:L},AP:{v:'A'},
         AQ:{f:`SUM(AQ${p0}:AQ${pl})`,v:W(sumAQ)},AR:{f:`SUM(AR${p0}:AR${pl})`,v:0},AS:{f:`AQ${rA}-AR${rA}`,v:W(sumAQ)}}, x.comp?null:'51');
-      const base=p=>{ const q=p.r, rr=r; return {A:{v:q.sno},B:{v:q.mark},D:{v:q.qty},E:{v:q.desc||q.D||''},F:{v:q.grade||''},G:{v:q.lenText||''},H:{v:q.pwt},I:{f:`ROUND(D${rr}*H${rr},1)`,v:W(q.qty*q.pwt)},J:{v:q.sa1},K:{f:`ROUND(D${rr}*J${rr},2)`,v:round2(q.qty*q.sa1)},
+      const base=p=>{ const q=p.r, rr=r; return {A:{v:q.sno},B:{v:q.mark},D:{v:q.qty},E:{v:q.desc||q.D||''},F:{v:q.grade||''},G:{v:q.lenText||''},H:{v:exact(rowT(q)/q.qty)},I:{f:`ROUND(D${rr}*H${rr},1)`,v:W(rowT(q))},J:{v:exact(rowS(q)/q.qty)},K:{f:`ROUND(D${rr}*J${rr},2)`,v:round2(rowS(q))},
         S:{f:`IF(AND(ISNUMBER(R${rr}),R${rr}>=D${rr}),"☑","☐")`,v:'☐'},AA:{f:`I${rr}*IFERROR(MIN(1,R${rr}/D${rr}),0)`,v:0},AO:{v:L},AP:{v:'P'}}; };
       const na=()=>({V:{v:'N/A'},W:{v:'N/A'},X:{v:'N/A'},Y:{v:'N/A'},AB:{f:`AA${r}`,v:0}});
       const weldF=()=>({W:{f:`IF(AND(ISNUMBER(V${r}),V${r}>=D${r}),"☑","☐")`,v:'☐'},AB:{f:`I${r}*IFERROR(MIN(1,V${r}/D${r}),0)`,v:0}});

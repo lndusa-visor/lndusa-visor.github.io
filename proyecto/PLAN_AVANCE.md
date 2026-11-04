@@ -57,10 +57,18 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 - Columna I en 8 columnas de 30 m: 0.1 lb (889.9 vs 889.8, 877.5 vs 877.4). La referencia no coincide con el BOM; fuente aún no encontrada.
 - K19, L19 y el valor de la columna L los completa el paso de troqueles.
 
+## PAINTING PROGRESS (AV.paintingSheet en avance-mto.js)
+- Una fila por pieza de montaje; piezas sueltas en su propia fila. Fórmulas iguales a la referencia en 30 m y 55 m.
+
+## Regla: el BOM manda y las fórmulas no se tocan
+- 9798 fórmulas en 55 m y 7677 en 30 m idénticas a la referencia, salvo los troqueles de la columna Z, que agrega su paso.
+- Peso y área unitarios (H, J de BOM CONNECTION; L de TAKEOFF; G, H de PAINTING) llevan los decimales del total del BOM; se ven redondeados por el formato de celda.
+- Suma de partes = 57378.7 lb (55 m) / 33897.3 lb (30 m). Suma de ensambles del BOM = 57378.9 / 33898.3. Esa diferencia ya viene dentro del BOM original.
+
 ## Control de pruebas
 - Los troqueles de la columna Z de BOM CONNECTION no los pone el generador: los agrega el paso «Agregar al Excel de avance». Falta encadenarlo.
 
 ## Siguiente
 1. Generador JS (Node + navegador) hoja por hoja, comparando celda por celda contra b30/b55.
-2. Orden: BOM CONNECTION (hecha) → TAKEOFF/MTO/CUTTING PLAN/NESTING (hechas) → VENDOR REQ/PO (hechas) → CUTTING TRACKING (hecha) → WELDING (hecha) → PAINTING → 3D CONTROL → DAILY/WEEKLY.
+2. Orden: BOM CONNECTION (hecha) → TAKEOFF/MTO/CUTTING PLAN/NESTING (hechas) → VENDOR REQ/PO (hechas) → CUTTING TRACKING (hecha) → WELDING (hecha) → PAINTING (hecha) → 3D CONTROL → DAILY/WEEKLY.
 3. Tablero: SCENES (partes, soldaduras, pernos, ptp, grid, info) desde el IFC.

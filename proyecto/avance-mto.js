@@ -59,7 +59,7 @@
     const tk=[noteRow(1,60,'TAKEOFF BASE','18',true),noteRow(2,61,'One row per BOM part line, with numeric quantities. Feeds the VENDOR REQUISITION and the MTO SUMMARY.')];
     const HT=['ASSEMBLY','PART MARK','TOTAL QTY.','DESCRIPTION','CATEGORY','MATERIAL','UNIT LENGTH (ft)','WIDTH (in)','THICKNESS (in)','TOTAL LENGTH (ft)','TOTAL AREA (ft²)','UNIT WEIGHT (lb)','TOTAL WEIGHT (lb)'], LET='ABCDEFGHIJKLM'.split('');
     tk.push({r:4,ht:'31.5',ch:true,cells:LET.map((c,i)=>({c,s:5,v:HT[i]}))});
-    P.forEach((p,i)=>{ const r=5+i, w=p.d?p.d.w:null, area=p.cat==='PLATE'?p.qty*p.lenFt*w/12:0; p.tl=p.qty*p.lenFt; p.ta=area; p.tw=p.qty*p.wt;
+    P.forEach((p,i)=>{ const r=5+i, w=p.d?p.d.w:null, area=p.cat==='PLATE'?p.qty*p.lenFt*w/12:0; p.tl=p.qty*p.lenFt; p.ta=area; p.tw=p.twt!=null?p.twt:p.qty*p.wt;
       const v={A:txt(p.asm),B:txt(p.mark),C:num(p.qty),D:txt(p.desc),E:txt(p.cat),F:txt(p.grade),G:num(p.lenFt),J:fx(`C${r}*G${r}`,p.tl),K:fx(`IF(E${r}="PLATE",C${r}*G${r}*H${r}/12,0)`,area),L:num(p.wt),M:fx(`C${r}*L${r}`,p.tw)};
       if(p.d){ v.H=num(w); v.I=num(p.d.t); }
       tk.push({r,ht:'15',ch:false,cells:cells('A10 B10 C133 D10 E10 F10 G154 H154 I154 J14 K14 L31 M31',v)}); });
@@ -123,7 +123,7 @@
       mt.push({r,ht:'15',ch:false,cells:cells(MS,{A:txt('PLATE'),B:txt(g.tok),C:txt(g.grade),D:fx(sf('C',1),q),E:fx(sf('K'),na),F:fx(sf('M',1),nw),G:txt(sTxt),H:fx(`${RQ(NS)}!C${g.subRow}`,g.sheets),I:fx(`H${r}*${sA}`,ga),J:fx(`I${r}*40.84*${g.t}`,gw),K:fx(`IFERROR(E${r}/I${r},0)`,na/ga),L:fx(`J${r}-F${r}`,gw-nw),M:txt('ft²')})}); r++; });
     const a=5, b=r-1, tq2=sumV(M,'q'), tn=sumV(M,'nw'), tg=sumV(M,'gw'), T=r;
     mt.push({r,ht:'15',ch:false,cells:cells('A99 B69 C69 D55 E69 F55 G69 H69 I69 J55 K53 L55 M69',{A:txt('TOTAL STEEL'),D:fx(`SUM(D${a}:D${b})`,tq2),F:fx(`SUM(F${a}:F${b})`,tn),J:fx(`SUM(J${a}:J${b})`,tg),K:fx(`IFERROR(F${r}/J${r},0)`,tn/tg),L:fx(`SUM(L${a}:L${b})`,tg-tn)})}); r++;
-    mt.push({r,ht:'15',ch:false,cells:cells('A156 F100 G33',{A:txt('Check vs BOM total weight'),F:fx(`${RQ(o.bomSheet)}!I${o.bomTotalRow}`,tn),G:fx(`IF(ABS(F${r}-F${T})<1,"OK","CHECK")`,'OK')})}); r+=2;
+    mt.push({r,ht:'15',ch:false,cells:cells('A156 F100 G33',{A:txt('Check vs BOM total weight'),F:fx(`${RQ(o.bomSheet)}!I${o.bomTotalRow}`,o.bomTotal??tn),G:fx(`IF(ABS(F${r}-F${T})<1,"OK","CHECK")`,'OK')})}); r+=2;
     mt.push({r,ht:'19.5',ch:true,cells:LET.map((c,i)=>({c,s:5,v:{A:'BOLTING',B:'DESCRIPTION',C:'GRADE',D:'FIELD',E:'SHOP',F:'TOTAL',G:'NUTS',H:'WASHERS',I:'SPARES %',J:'TO BUY (bolts)',M:'UNIT'}[c]??null}))}); r++;
     const bf=r; let F=0,Sh=0,Buy=0; (o.bolts||[]).forEach(x=>{ const t=x.field+x.shop, buy=Math.ceil(t*(1+spares)-1e-9); F+=x.field; Sh+=x.shop; Buy+=buy;
       mt.push({r,ht:'15',ch:false,cells:cells('A63 B10 C10 D157 E157 F123 G75 H75 I158 J123 M29',{A:txt('BOLT'),B:txt(x.desc),C:txt(x.grade),D:num(x.field),E:num(x.shop),F:fx(`D${r}+E${r}`,t),G:fx(`F${r}`,t),H:fx(`F${r}`,t),I:fx(`'VENDOR REQUISITION'!$C$7`,spares),J:fx(`ROUNDUP(F${r}*(1+I${r}),0)`,buy),M:txt('ea')})}); r++; });
@@ -270,5 +270,33 @@
       if(r<=DAYS) Object.assign(v,{W:fx(r===a?"'DAILY REPORT'!$C$7":`W${r-1}+1`,st+r-a),X:{f:`IF(W${r}<=TODAY(),SUMIFS(${br('AR')},${br('Y')},W${r},${br('AP')},"<>A"),"")`},Y:{f:r===a?`IF(W${r}<=TODAY(),X${r},"")`:`IF(W${r}<=TODAY(),N(Y${r-1})+X${r},"")`},Z:{f:`IF(W${r}<=TODAY(),IFERROR(Y${r}/$G$${T},0),"")`}});
       rows.push({r,ht:'15',ch:false,cells:cells([x?PS:r===T?TS:'',r<=DAYS?DS:''].filter(Boolean).join(' '),v)}); }
     return {rows,lastCol:'Z',filter:`$A$20:$V$${z}`,merges:['A4:E4','A5:D5','A6:D6','A7:D7','A8:D8','G10:I10','G11:I11','G12:I12','G13:I13','G14:I14','G15:I15','G4:J4','G5:I5','G6:I6','G7:I7','G8:I8','G9:I9','L12:R12','L4:P4'],subst:[[/<autoFilter ref="[^"]*">/,`<autoFilter ref="A20:V${z}">`],[/sqref="[^"]*"/g,m=>m.replace(/([A-Z]+21:[A-Z]+)\d+/g,`$1${z}`)]],nodes:N}; };
+
+  /* ---- PAINTING PROGRESS: una fila por pieza de montaje; pesos y áreas por pieza del BOM original (sin las partes sueltas) ---- */
+  AV.paintingSheet=function(o,M,bom,W){ const B={}; bom.rows.forEach(R=>{ const c={}; R.cells.forEach(x=>c[x.c]=x); if(c.AP&&c.AP.v==='A') B[c.B.v]={E:c.E.v}; });
+    const nodes={}, P=[]; W.nodes.forEach(n=>{ (nodes[n.mark]=nodes[n.mark]||[]).push(n.node); });
+    M.forEach(x=>{ const el=elemName(B[x.mark].E), comp=x.comp, a=+((x.sa-(x.looseSa||0))/x.qty).toFixed(4), w=+((x.twt-(x.looseT||0))/x.qty).toFixed(4);  // sin redondear: la suma debe dar el total del BOM
+      for(let i=0;i<x.qty;i++) P.push({mark:x.mark,c:`${i+1}/${x.qty}`,node:comp?nodes[x.mark][i]:null,el,comp,a,w});
+      (x.lp||[]).forEach(l=>{ for(let i=0;i<l.qty;i++) P.push({mark:l.mark,c:`${i+1}/${l.qty}`,node:null,el:elemName(l.type),comp:false,a:+(l.sa/l.qty).toFixed(4),w:+(l.twt/l.qty).toFixed(4)}); }); });
+    const n=P.length, a=25, z=24+n, T=z+1, rg=c=>`$${c}$${a}:$${c}$${z}`, rows=[], S=(r,ht,sp,v,ch)=>rows.push({r,ht,ch:!!ch,cells:cells(sp,v)}), sum=k=>P.reduce((t,x)=>t+x[k],0), TA=sum('a'), wr=W.nodes.length+20, nComp=P.filter(x=>x.comp).length;
+    rows.push(noteRow(1,60,'PAINTING PROGRESS TRACKING – COATING SYSTEM CS1','18',true),noteRow(2,61,`One row per erection piece (${n}). Paint area per BOM (Surface Area). Composite pieces are not painted until their welding is RELEASED.`));
+    const els=[...new Set(P.map(x=>x.el))].sort(), elv=r=>{ const e=els[r-6]; if(!e) return {}; const g=P.filter(x=>x.el===e), ar=g.reduce((t,x)=>t+x.a,0); return {M:txt(e),N:fx(`COUNTIF(${rg('E')},M${r})`,g.length),O:fx(`SUMIFS(${rg('G')},${rg('E')},M${r})`,ar),P:fx(`IF(O${r}=0,0,SUMIFS(${rg('G')},${rg('E')},M${r},${rg('J')},">0")/O${r})`,0)}; };
+    S(4,'15','A70 B70 C70 D70 E70 F70 H70 I70 J70 K70 M70 N70 O70 P70',{A:txt('COATING SYSTEM CS1 (spec. tables 9.1 / 13.1) – reference'),H:txt('SUMMARY'),M:txt('BY ELEMENT')});
+    S(5,'51','A137 B137 C137 D137 E137 F137 H10 I10 J10 K72 M129 N129 O129 P129',{A:txt('COAT'),B:txt('GENERIC TYPE'),C:txt('SHERWIN WILLIAMS'),D:txt('PPG (alternate)'),E:txt('DFT min. (µm)'),F:txt('DFT min. (mils)'),H:txt('Pieces to paint'),K:fx(`COUNTA(${rg('B')})`,n),M:txt('ELEMENT'),N:txt('PIECES'),O:txt('AREA (ft²)'),P:txt('PAINTED (area)')},true);
+    const C='A130 B10 C10 D132 E64 F138 H10 I10 J10', E=' M10 N64 O75 P76', co=(r,k,v)=>S(r,'15',C+` K${k}`+E,Object.assign(v,elv(r)));
+    co(6,123,{A:txt('Surface preparation'),B:txt('Abrasive blast cleaning per spec.'),C:txt('—'),D:txt('—'),H:txt('Total area (ft²)'),K:fx(`SUM(${rg('G')})`,TA)});
+    co(7,72,{A:txt('Primer coat'),B:txt('Inorganic zinc silicate'),C:txt('Zinc Clad II Plus'),D:txt('Dimetcote 9'),E:num(75),F:num(3),H:txt('Waiting for weld release'),K:fx(`COUNTIF(${rg('N')},"WAITING*")`,nComp)});
+    co(8,72,{A:txt('Mid coat'),B:txt('Hi solids epoxy'),C:txt('Macropoxy 646-100'),D:txt('Amerlock 2 VOC'),E:num(125),F:num(4.9),H:txt('Pieces painted'),K:fx(`COUNT(${rg('J')})`,0)});
+    co(9,123,{A:txt('Topcoat'),B:txt('Polysiloxane'),C:txt('Sher-Loxane 800 / Hi Solids'),D:txt('PSX 700'),E:num(125),F:num(4.9),H:txt('Area painted (ft²)'),K:fx(`SUMIFS(${rg('G')},${rg('J')},">0")`,0)});
+    co(10,72,{A:txt('Total system'),B:txt('Total DFT ≥ 325 µm (checked at final inspection)'),C:txt('—'),D:txt('—'),E:num(325),F:num(12.8),H:txt('READY TO SHIP (inspection accepted)'),K:fx(`COUNT(${rg('M')})`,0)});
+    S(11,'15','H10 I10 J10 K72'+E,Object.assign({H:txt('IN TRANSIT (with packing list)'),K:fx(`COUNTIF(${rg('N')},"IN TRANSIT")`,0)},elv(11)));
+    S(12,'15','A85 H130 I130 J130 K53'+E,Object.assign({A:txt('PAINTING DATE = date the piece was painted (complete system). B&P weight 25 % of the piece; final inspection accepted = READY TO SHIP (10 %).'),H:txt('PROGRESS (area painted)'),K:fx(`IF(SUM(${rg('G')})=0,0,SUMPRODUCT(${rg('O')},${rg('G')})/SUM(${rg('G')}))`,0)},elv(12)));
+    S(13,'15',E.trim(),elv(13));
+    rows.push(noteRow(21,85,'How to fill: PAINTING DATE when the piece is painted, then FINAL INSPECTION (list) and its date. STATUS and % PROGRESS are calculated; WELD RELEASED is read from WELDING PROGRESS. READY TO SHIP = final inspection accepted. When shipped, enter PACKING LIST No. and SHIP DATE → IN TRANSIT.'),noteRow(22,124,'Fill example (not real data): Painting date 12/10/2026 · Final inspection READY TO SHIP · 12/11/2026 → STATUS = READY TO SHIP · Packing list PL-010 · Ship date 12/14/2026 → IN TRANSIT.'));
+    const HH=['ITEM','MARK','PIECE','NODE','ELEMENT','CONDITION','AREA (ft²)','WEIGHT (lb)','WELD RELEASED','PAINTING DATE','FINAL INSPECTION','INSP. DATE','READY TO SHIP DATE','STATUS','% PROGRESS (B&P)','REMARKS','PACKING LIST No.','SHIP DATE'];
+    rows.push({r:24,ht:'45',ch:true,cells:'ABCDEFGHIJKLMNOPQR'.split('').map((c,i)=>({c,s:5,v:HH[i]}))});
+    P.forEach((x,i)=>{ const r=a+i, st=`'WELDING PROGRESS'!`; S(r,'15','A29 B130 C29 D29 E10 F29 G32 H31 I125 J37 K21 L37 M139 N29 O74 P127 Q21 R37',Object.assign({A:num(i+1),B:txt(x.mark),C:txt(x.c),E:txt(x.el),F:txt(x.comp?'COMPOSITE':'LOOSE'),G:num(x.a),H:num(x.w),I:x.comp?fx(`IF(INDEX(${st}$O$21:$O$${wr},MATCH(D${r},${st}$C$21:$C$${wr},0))="RELEASED","YES","NO")`,'NO'):txt('N/A'),
+      M:fx(`IF(K${r}="READY TO SHIP",IF(L${r}<>"",L${r},IF(J${r}<>"",J${r},"")),"")`,''),N:fx(`IF(AND(Q${r}<>"",K${r}="READY TO SHIP"),"IN TRANSIT",IF(K${r}="READY TO SHIP","READY TO SHIP",IF(K${r}="REJECTED","REPAIR",IF(J${r}<>"","PAINTING",IF(I${r}="NO","WAITING FOR WELD","PENDING")))))`,x.comp?'WAITING FOR WELD':'PENDING'),O:fx(`IF(OR(J${r}<>"",K${r}="READY TO SHIP"),1,0)`,0)},x.node?{D:num(x.node)}:{})); });
+    S(T,'15','A69 B99 C69 D69 E69 F69 G55 H55 I69 J69 K69 L69 M69 N69 O136 P69 Q69 R69',{B:txt('TOTAL'),G:fx(`SUM(G${a}:G${z})`,TA),H:fx(`SUM(H${a}:H${z})`,sum('w')),O:fx('K12',0)});
+    return {rows,lastCol:'R',filter:`$A$24:$R$${z}`,merges:['A4:F4','H10:J10','H11:J11','H12:J12','H4:K4','H5:J5','H6:J6','H7:J7','H8:J8','H9:J9','M4:P4'],subst:[[/<autoFilter ref="[^"]*">/,`<autoFilter ref="A24:R${z}">`],[/sqref="[^"]*"/g,m=>m.replace(/([A-Z]+25:[A-Z]+)\d+/g,`$1${z}`)]],pieces:P}; };
   AV._rd=rd; AV._g6=g6; AV._ftIn=ftIn;
 })(typeof window!=='undefined'?window:globalThis);
