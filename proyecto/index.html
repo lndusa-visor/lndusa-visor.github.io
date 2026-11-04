@@ -156,6 +156,11 @@ details.sec>div{padding-top:10px;display:flex;flex-direction:column;gap:10px}
             <div class="row" style="margin-top:8px;align-items:center"><button type="button" id="ghPub">Publicar visor en GitHub</button><span class="hint" id="ghInfo" aria-live="polite"></span></div>
           </div>
           <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
+            <b>Generar Excel de avance</b>
+            <span class="hint">Con el BOM, el IFC y el Bolt Summary cargados, arma el Excel de avance completo de cada unidad, con los troqueles y las pestañas LISTA DE TROQUELADOS, PR SAP y PLAN DE CORTE. Usa los largos de barra y la lámina que elegiste abajo.</span>
+            <div class="row" style="margin-top:8px;align-items:center"><div class="field" style="flex:0 1 170px"><label class="hint" for="avStart">Fecha de inicio</label><input type="date" id="avStart"></div><button type="button" id="avGen">Generar Excel de avance</button><span class="hint" id="avGenInfo" aria-live="polite"></span></div>
+          </div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
             <b>Agregar al Excel de avance</b>
             <span class="hint">Elige el Excel de avance (BOM_Connection_Type) de cada unidad. Sale una copia con los troqueles en la columna Piece Die Stamp (la letra arriba de «PIECE DIE STAMP (BOM)» en Welding Progress) y las pestañas nuevas LISTA DE TROQUELADOS, PR SAP y PLAN DE CORTE. Lo demás del Excel no se toca.</span>
             <div class="row" style="margin-top:8px;align-items:center"><label class="ghost" style="cursor:pointer;display:inline-block;padding:8px 12px;border:1px solid var(--line)">Elegir Excel de avance<input type="file" id="avFile" accept=".xlsx,.xlsm" multiple hidden></label><span class="hint" id="avInfo" aria-live="polite"></span></div>
@@ -4286,6 +4291,29 @@ load(RAW_SAMPLE,'BESS Area PDC and Transformer','Ejemplo: BESS Assembly List BOM
       info.innerHTML=`Publicado: ${r.parts} partes y ${r.asms} piezas soldadas${r.units?' en '+r.units.length+' unidades':''}. Link: <a href="${esc2(r.url)}" target="_blank" rel="noopener">${esc2(r.url)}</a> (GitHub tarda 1–2 minutos en mostrarlo).`;
     }catch(e){ console.error(e); info.textContent=(e&&e.status===401?'El token no sirve o venció. ':e&&e.status===404?'El token no tiene acceso al repositorio lndusa-visor.github.io. ':'')+'No se pudo publicar: '+(e&&e.message||e); }
     finally{ bt.disabled=false; fr.remove(); } };
+})();
+</script>
+<script src="avance-gen.js"></script>
+<script src="avance-mto.js"></script>
+<script>
+/* botón «Generar Excel de avance»: plantilla + generador + troqueles y pestañas, un Excel por unidad */
+(function(){ const $i=id=>document.getElementById(id), info=t=>{ $i('avGenInfo').textContent=t; }, st=$i('avStart'); if(st&&!st.value) st.value=new Date().toISOString().slice(0,10);
+  const btn=$i('avGen'); if(!btn) return;
+  btn.addEventListener('click',async()=>{ try{
+    if(typeof P==='undefined'||!P||!book){ info('Primero carga los BOM.'); return; }
+    if(typeof ifc==='undefined'||!ifc||typeof asmGeo==='undefined'||!asmGeo.size){ info('Falta el IFC.'); return; }
+    if(typeof bolts==='undefined'||!bolts){ info('Falta el Bolt Summary.'); return; }
+    btn.disabled=true; info('Preparando…');
+    const [tR,jR]=await Promise.all([fetch('avance-plantilla.xlsx',{cache:'no-store'}),fetch('avance-tpl-bom.json',{cache:'no-store'})]); if(!tR.ok||!jR.ok) throw new Error('No pude leer la plantilla del Excel.');
+    const tpl=await tR.arrayBuffer(), bt=await jR.json(), stock={}; let free=[];
+    book.profs.forEach(p=>{ const k=String(p.prof).split('|')[0], v=typeof p.stock==='number'?p.stock:(typeof p.sel==='number'?p.sel:+p.sel); if(v>0) stock[k]=v; else free.push(k); });
+    if(free.length){ info('Elige un largo fijo para: '+[...new Set(free)].join(', ')); return; }
+    const a=(book.ths[0]&&book.ths[0].sheetA)||32, sheet=AREA_SZ[a]||[4,8], units=P.unitMode&&P.units&&P.units.length>1?P.units.map(u=>u.label):[undefined], over=[]; let n=0;
+    for(const u of units){ info(`Generando ${u||'el proyecto'}…`); const G=await AV.generate(tpl.slice(0),bt,{unit:u,stock,sheet,startDate:st.value||new Date().toISOString().slice(0,10),kerf:(+$i('kerf').value||0.125),trim:(+$i('trim').value||0.5),gap:(+$i('plGap').value||0.25),edge:(+$i('plEdge').value||0.5)});
+      if(G.over.length||G.overPlates.length||G.miss.length) over.push(`${u||'proyecto'}: ${G.over.length+G.overPlates.length} piezas no caben en barra o lámina${G.miss.length?` · ${G.miss.length} materiales sin fila`:''}`);
+      await addToAvance(new File([G.blob],G.name),info); n++; }
+    info(`Listo: ${n} Excel de avance descargado${n>1?'s':''}.${over.length?' Revisa: '+over.join(' · '):''}`);
+  }catch(e){ console.error(e); info('No se pudo generar: '+(e&&e.message||e)); } finally{ btn.disabled=false; } });
 })();
 </script>
 </body></html>

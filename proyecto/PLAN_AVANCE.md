@@ -80,7 +80,7 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 
 ## Excel completo (AV.generate + addToAvance)
 - avance-plantilla.xlsx sale de tools/avance_plantilla.py (15 hojas, sin datos del proyecto, salvo el cronograma de WEEKLY NOTES). AV.generate arma el Excel de una unidad; después va addToAvance.
-- Probado en navegador con la librería real (xlsx-js-style) y JSZip, cargando 30 m y 55 m juntos: 19 hojas, misma estructura y formato; pestañas agregadas idénticas a la referencia. Falta botón en la página y unificar el cronograma.
+- Probado en navegador con la librería real (xlsx-js-style) y JSZip, cargando 30 m y 55 m juntos: 19 hojas, misma estructura y formato; pestañas agregadas idénticas a la referencia. Botón «Generar Excel de avance» ya en proyecto/index.html, probado con clic real y descarga de un Excel por unidad. Falta definir el cronograma de WEEKLY NOTES para proyectos nuevos.
 - Solo cambian: decimales de peso/área del BOM, regla de soldadura aceptada, nota de pernos del 30 m, 8 pesos de 0.1 lb.
 - bolts.list y P.units[].meta guardan los datos de cada unidad.
 
@@ -88,6 +88,10 @@ MTO SUMMARY 84/50 · PROFILE CUTTING PLAN 177/30 · PLATE NESTING 36/19
 - Los troqueles de la columna Z de BOM CONNECTION no los pone el generador: los agrega el paso «Agregar al Excel de avance». Falta encadenarlo.
 
 ## Siguiente
-1. Generador JS (Node + navegador) hoja por hoja, comparando celda por celda contra b30/b55.
-2. Orden: BOM CONNECTION (hecha) → TAKEOFF/MTO/CUTTING PLAN/NESTING (hechas) → VENDOR REQ/PO (hechas) → CUTTING TRACKING (hecha) → WELDING (hecha) → PAINTING (hecha) → 3D CONTROL (hecha) → DAILY/WEEKLY.
-3. Tablero: SCENES (partes, soldaduras, pernos, ptp, grid, info) desde el IFC.
+1. Tablero para proyectos nuevos, en una copia (proyecto/tablero.html) del Weld Map con PR SAP; el original no se toca.
+   - El tablero fija proyectos en SCENES, PROJS, PKEYS, en la validación de PROJ y en readExcel (nombre exacto de la hoja BOM).
+   - Falta AV.scene: construir desde el IFC la escena (A, info, parts, welds, bolts, btype, bai, bown, ptp, bsum, bx, grid, pdesc, K, J) y compararla con SCENES.w55 y SCENES.w30.
+   - El 3D ID de A debe seguir el orden de 3D CONTROL. Scene guardada en GitHub por proyecto, como los visores; se agrega al selector de unidades y a la vista sumada.
+   - Abrir «Nuevo proyecto» desde el tablero con las opciones de carga, sin alterar sus pestañas.
+2. Decidir el cronograma de WEEKLY NOTES.
+3. Prueba final en Excel real y publicar en main.
