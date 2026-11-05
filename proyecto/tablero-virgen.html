@@ -71,6 +71,8 @@ h1{font-family:var(--f-disp);font-weight:700;font-size:clamp(20px,1.9vw,28px);ma
 .legbox .sep{border-top-color:#3d4b59}
 .hint{position:absolute;left:10px;bottom:8px;font:11.5px var(--f-mono);color:#4f5b66;pointer-events:none}
 :root,:root[data-theme]{--view:#ffffff!important}
+:root[data-view="k"],:root[data-view="k"][data-theme]{--view:#0b0e11!important}
+:root[data-view="k"] .viewer .hint{color:#aeb9c3}
 .tip{position:absolute;pointer-events:none;background:rgba(13,18,23,.92);color:#eef2f5;border:1px solid #3d4b59;border-radius:4px;padding:5px 8px;font:12px var(--f-mono);white-space:nowrap;transform:translate(10px,10px)}
 /* right panel with tabs */
 .side{display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0;min-height:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
@@ -319,6 +321,10 @@ details.plg summary{font-weight:500;font-size:12px;line-height:1.5} details.plg 
           <button id="t-grid" aria-pressed="true" data-i="tGrid"></button>
           <button id="t-dim" aria-pressed="true" data-i="tDim"></button>
         </div>
+        <div class="grp" role="group">
+          <button id="bg-w" aria-pressed="true" data-i="bgW"></button>
+          <button id="bg-k" aria-pressed="false" data-i="bgK"></button>
+        </div>
         <div class="grp"><button id="reset" data-i="reset"></button></div>
       </div>
       <details class="legbox" open>
@@ -371,16 +377,18 @@ details.plg summary{font-weight:500;font-size:12px;line-height:1.5} details.plg 
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script><script>if(!window.THREE){document.addEventListener("DOMContentLoaded",function(){var d=document.createElement("div");d.style.cssText="position:fixed;inset:0;z-index:99;background:#fff;color:#1b2530;font:16px system-ui;padding:40px";d.innerHTML="<h2>The 3D library could not be loaded / No se pudo cargar la librería 3D</h2><p>This file needs an internet connection the first time it opens (three.js from cdnjs.cloudflare.com and cdn.jsdelivr.net). Este archivo necesita internet la primera vez que se abre.</p>";document.body.appendChild(d);});}</script><script>window.EMBED_PROG=null;</script>
+<!--NP-PACK--><!--TB-DATA-->
 <script>
-const TB = (function(){ const base = 'https://lndusa-visor.github.io/tablero-datos/', NP = 'https://lndusa-visor.github.io/proyecto/', get = u => { const r = new XMLHttpRequest(); r.open('GET', u+'?v='+Date.now(), false); r.send(); if(r.status!==200) throw new Error(u+' · '+r.status); return JSON.parse(r.responseText); }, E = t => String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+/* plantilla: sin proyecto adentro, abre «Nuevo proyecto» (viene comprimido en este mismo archivo).
+   HTML de un proyecto: lleva su 3D en #tb-data y no pide nada a GitHub. */
+const TB = (function(){ const NP = 'https://lndusa-visor.github.io/proyecto/', E = t => String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),
+    txt = id => ((document.getElementById(id)||{}).textContent||'').trim(), PACK = txt('np-pack'), RAW = txt('tb-data'),
+    unz = b => new Response(new Blob([Uint8Array.from(atob(b),c=>c.charCodeAt(0))]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
   const home = (msg, list) => { document.documentElement.innerHTML = `<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tablero de avance</title><style>:root{--bg:#f3f4f2;--ink:#1d2326;--card:#fff;--line:#d5dbdf;--acc:#1f5fa8}@media (prefers-color-scheme:dark){:root{--bg:#15191b;--ink:#e8ecee;--card:#1f2528;--line:#33393d;--acc:#6ea8e6}}body{margin:0;padding:32px 16px;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,sans-serif}main{max-width:620px;margin:0 auto}h1{margin:0 0 6px;font-size:26px}p{margin:0 0 18px}.b{display:inline-block;margin:0 0 18px;padding:11px 16px;border:0;border-radius:5px;background:var(--acc);color:#fff;font:600 15px system-ui,sans-serif;cursor:pointer}a.p{display:block;margin:0 0 8px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:5px;color:inherit;text-decoration:none}a.p b{display:block}a.p span{font-size:14px;opacity:.75}#n{display:none;position:fixed;inset:0;background:var(--bg);grid-template-rows:auto minmax(0,1fr)}#n div{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:2px solid var(--acc)}#n iframe{width:100%;height:100%;border:0}#n button{padding:6px 12px;cursor:pointer}</style></head><body><main><h1>Tablero de avance</h1><p>${E(msg)}</p><button class="b" id="o" type="button">＋ Nuevo proyecto</button>${list.map(p=>`<a class="p" href="?g=${encodeURIComponent(p.code)}"><b>${E(p.code)}</b><span>${E(p.name||p.title||'')}</span></a>`).join('')}</main><div id="n"><div><b>Nuevo proyecto</b><button id="c" type="button">✕</button></div><iframe id="f" title="Nuevo proyecto"></iframe></div></body>`;
-    const $ = i => document.getElementById(i); $('o').onclick = () => { const f=$('f'); if(!f.src) f.src=NP+'?v='+Date.now(); $('n').style.display='grid'; }; $('c').onclick = () => location.reload(); throw new Error('Elegir proyecto'); };
-  // cada HTML abre un solo proyecto: el que lleva en su nombre («US.071.1 Tablero.html»); no lista los demás
-  const name = decodeURIComponent(location.pathname.split('/').pop()||''), q = new URLSearchParams(location.search).get('g'), m = name.match(/^(.+?)\s+Tablero/i), u = name.match(/US[._ -]?\d{3}[._ -]\d+/i), code = q || (m && m[1].trim()) || (u && u[0].toUpperCase().replace(/[_ -]/g,'.'));
-  if(!code) home('Crea un proyecto. Al terminar se descarga su propio HTML: guárdalo en la carpeta del proyecto y ábrelo desde ahí.', []);
-  const folder = code.replace(/[^A-Za-z0-9._-]+/g,'_'), cur = {code, folder}; let meta = null;
-  try{ meta = get(base+encodeURIComponent(folder)+'/proyecto.json'); }catch(e){ home('Todavía no encuentro el proyecto '+code+'. Si lo acabas de crear, espera 2 minutos y recarga. Revisa también la conexión a internet.', []); }
-  return {solo:true, list:[cur], cur, base, title:meta.title, projs:meta.projs, keys:meta.keys, scene:k=>{ try{ return get(base+encodeURIComponent(folder)+'/'+encodeURIComponent(k)+'.json'); }catch(e){ home('No pude leer el 3D de '+code+'.', []); } }}; })();
+    const $ = i => document.getElementById(i); $('o').onclick = async () => { const f=$('f'); $('n').style.display='grid'; if(f.src||f.srcdoc) return; if(!PACK){ f.src=NP+'?v='+Date.now(); return; } try{ f.srcdoc = await unz(PACK); }catch(e){ f.srcdoc='<p style="font:16px system-ui;padding:24px">No pude abrir Nuevo proyecto. Usa Chrome o Edge actualizados.</p>'; } }; $('c').onclick = () => location.reload(); throw new Error('Elegir proyecto'); };
+  if(!RAW) home('Crea un proyecto. Al terminar se descargan sus Excel y su propio HTML: guárdalos en la carpeta del proyecto y abre el HTML desde ahí.', []);
+  const D = JSON.parse(RAW), cur = {code:D.meta.code, folder:D.meta.folder};
+  return {solo:true, emb:true, list:[cur], cur, title:D.meta.title, projs:D.meta.projs, keys:D.meta.keys, scene:k=>D.scenes[k]}; })();
 const PROJS = TB.projs;
 const PKEYS = TB.keys;
 const lsGet = k => { try{ return localStorage.getItem(k); }catch(e){ return null; } }, lsSet = (k, v) => { try{ localStorage.setItem(k, v); return true; }catch(e){ return false; } };
@@ -565,11 +573,11 @@ const TERMS_ES = {'BEAM':'VIGA','COLUMN':'COLUMNA','POST':'POSTE','FRAME':'MARCO
 ['en','es'].forEach(l=>{ const P = PM[l];
   I18N[l].title = TB.title; Object.assign(I18N[l], PM.tx[l]);
   I18N[l].nHelp = I18N[l].nHelp.replace('DPR-5FR1A', PM.ex); });
-Object.assign(I18N.en, {sumH1:TB.title, pSel:'Project', pAll:`Summary · ${PKEYS.length} projects`, sumTitle:`Summary of the ${PKEYS.length} projects`, sumNote:'Each card shows the figures of the last Excel loaded for that project (its own calculation at the date of the file). Total = weighted by weight.',
+Object.assign(I18N.en, {bgW:'White', bgK:'Black', sumH1:TB.title, pSel:'Project', pAll:`Summary · ${PKEYS.length} projects`, sumTitle:`Summary of the ${PKEYS.length} projects`, sumNote:'Each card shows the figures of the last Excel loaded for that project (its own calculation at the date of the file). Total = weighted by weight.',
   sumNoXl:'No Excel loaded yet', sumLoad:'Load Excel', sumOpen:'Open 3D', sumFile:'{0} · loaded {1}', sumAt:'at {0}', sumTot:'Total 2 projects', sumScope:'{0} pieces · {1} lb',
   sumWeek:'Physical progress by weekly cut-off', sumNoW:'No cut-offs yet.', sumOther:'This workbook belongs to {0}: it was saved there.', sumSaved:'Saved for {0}.', sumNoStore:'This browser does not keep data between projects: load the Excel again after switching.',
   rCut:'Material cutting', rFab:'In fabrication', rDone:'Completed', rPaint:'Painted', rRts:'Ready to ship', rTr:'In transit', rParts:'{0} / {1} parts', rLC:'L {0} · C {1}'});
-Object.assign(I18N.es, {sumH1:TB.title, pSel:'Proyecto', pAll:`Resumen · ${PKEYS.length} proyectos`, sumTitle:`Resumen de los ${PKEYS.length} proyectos`, sumNote:'Cada tarjeta muestra las cifras del último Excel cargado de ese proyecto (su propio cálculo a la fecha del archivo). Total = ponderado por peso.',
+Object.assign(I18N.es, {bgW:'Blanco', bgK:'Negro', sumH1:TB.title, pSel:'Proyecto', pAll:`Resumen · ${PKEYS.length} proyectos`, sumTitle:`Resumen de los ${PKEYS.length} proyectos`, sumNote:'Cada tarjeta muestra las cifras del último Excel cargado de ese proyecto (su propio cálculo a la fecha del archivo). Total = ponderado por peso.',
   sumNoXl:'Aún sin Excel cargado', sumLoad:'Cargar Excel', sumOpen:'Abrir 3D', sumFile:'{0} · cargado {1}', sumAt:'al {0}', sumTot:'Total 2 proyectos', sumScope:'{0} piezas · {1} lb',
   sumWeek:'Avance físico por corte semanal', sumNoW:'Aún sin cortes.', sumOther:'Este libro pertenece a {0}: se guardó ahí.', sumSaved:'Guardado para {0}.', sumNoStore:'Este navegador no guarda datos entre proyectos: vuelva a cargar el Excel después de cambiar.',
   rCut:'Corte de material', rFab:'En fabricación', rDone:'Completas', rPaint:'Pintadas', rRts:'Listo para envío', rTr:'En tránsito', rParts:'{0} / {1} partes', rLC:'S {0} · C {1}'});
@@ -813,6 +821,8 @@ function setView(v){
   ctl.update();
 }
 ['iso','top','front'].forEach(k=>document.getElementById('v-'+k).onclick=()=>setView(k));
+{ const setBg = k => { document.documentElement.setAttribute('data-view',k); lsSet('wtb-view',k); ['w','k'].forEach(x=>document.getElementById('bg-'+x).setAttribute('aria-pressed',String(x===k))); };
+  ['w','k'].forEach(k=>document.getElementById('bg-'+k).onclick=()=>setBg(k)); setBg(lsGet('wtb-view')==='k'?'k':'w'); }   // fondo del 3D: blanco o negro, se recuerda en este navegador
 document.getElementById('reset').onclick=()=>{ select(null); setView('iso'); };
 const tl = document.getElementById('t-lbl'), tg = document.getElementById('t-grid'), td = document.getElementById('t-dim');
 tl.onclick=()=>{state.labels=!state.labels; tl.setAttribute('aria-pressed',state.labels);};
@@ -1515,7 +1525,7 @@ function resize(){ const w=host.clientWidth, h=host.clientHeight, dpr=Math.min(d
 function bg(){ renderer.setClearColor(css('--view')); }
 new ResizeObserver(resize).observe(host);
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', bg);
-new MutationObserver(bg).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+new MutationObserver(bg).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme','data-view']});
 renderStatic(); renderList(); resize(); bg(); setView('iso'); apply(); renderInsp(); renderBolts(); renderNotes(); renderMat(); setTitle();
 try{ const saved = JSON.parse(lsGet('wtp-prog-'+PSC)||'null') || (window.EMBED_PROG ? JSON.parse(JSON.stringify(window.EMBED_PROG)) : null);
   if(saved && saved.f){ const f={}; Object.entries(saved.f).forEach(([k,v])=>f[+k]=v); Object.keys(f).forEach(k=>f[k]=normF(f[k])); saved.f=f; if(saved.p){ const p={}; Object.entries(saved.p).forEach(([k,v])=>p[+k]=v); saved.p=p; } if(saved.x){ const x={}; Object.entries(saved.x).forEach(([k,v])=>x[+k]=v); saved.x=x; } if(saved.wi){ const w={}; Object.entries(saved.wi).forEach(([k,v])=>w[+k]=v); saved.wi=w; } if(saved.ar){ const w={}; Object.entries(saved.ar).forEach(([k,v])=>w[+k]=v); saved.ar=w; } setProg(saved); } else renderProg(); }catch(e){ renderProg(); }
@@ -1601,6 +1611,6 @@ initShared();
 (function(){ const L=(es,en)=>LANG==='es'?es:en, $=id=>document.getElementById(id), fill=()=>{ const gp=$('grpsel'), gb=$('grpbox'), nw=$('h-newt'), gl=$('grplb'); if(nw) nw.textContent=L('Nuevo proyecto','New project'); if(gl) gl.textContent=L('Contrato','Contract'); if(!gp) return; gp.innerHTML=TB.list.map(p=>`<option value="${String(p.code).replace(/"/g,'&quot;')}">${p.code}</option>`).join(''); gp.value=TB.cur.code; gb.hidden=TB.list.length<2; };
   const lists=()=>TB.solo?Promise.resolve():fetch(TB.base+'index.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{ if(!j) return; const seen=new Set(TB.list.map(p=>p.code)); (j.proyectos||[]).forEach(p=>{ if(!seen.has(p.code)){ TB.list.push({code:p.code}); seen.add(p.code); } }); fill(); }).catch(()=>{});
   $('grpsel').onchange=e=>{ location.href=location.pathname+'?g='+encodeURIComponent(e.target.value); };
-  const box=$('np-box'); $('h-new').onclick=()=>{ const f=$('np-frame'); if(!f.src) f.src='https://lndusa-visor.github.io/proyecto/?v='+Date.now(); box.style.display='grid'; }; $('np-close').onclick=()=>{ box.style.display='none'; lists(); };
+  const box=$('np-box'); $('h-new').style.display='none'; /* el HTML de un proyecto no crea proyectos: eso lo hace la plantilla */ $('np-close').onclick=()=>{ box.style.display='none'; lists(); };
   $('np-title').textContent='Nuevo proyecto'; fill(); ['lang-en','lang-es'].forEach(i=>{ const b=$(i); if(b) b.addEventListener('click',()=>setTimeout(fill,0)); }); lists(); })();
 </script>

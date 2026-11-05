@@ -742,7 +742,7 @@ const APP_SHELL='<div class="wrap" id="app"><div class="top"><div><div class="br
   window.ghPublishVisor=async function({files:fileList,code,name,token,onProgress,source}){
     const prog=onProgress||(()=>{}), folder=folderOf(code); if(!folder) throw new Error('Falta el código del proyecto.'); if(!token) throw new Error('Falta el token de GitHub.');
     await gh(token,'');   // valida el token y el acceso al repositorio antes de procesar
-    const tpl=await (await fetch(location.href.split('#')[0].split('?')[0],{cache:'no-store'})).text();
+    const tpl=window.__visorTpl||await (await fetch(location.href.split('#')[0].split('?')[0],{cache:'no-store'})).text();   // __visorTpl: la plantilla autónoma trae el visor adentro
     const files=[]; for(const f of fileList) files.push({name:f.name,text:await f.text()});
     const out=[]; let n=0;
     const up=async x=>{ if(typeof x==='string'){ out.push({path:'a/model3d.json',data:x}); return 'a/model3d.json'; }
