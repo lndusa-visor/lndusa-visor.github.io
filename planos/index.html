@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Drawing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@700&family=JetBrains+Mono:wght@600&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+/* Plano de una pieza desde el QR de la Lista de troquelados: proyecto arriba, datos de la pieza, hoja con zoom de dedos */
+:root{--bg:#eef1f4;--paper:#fff;--ink:#17202b;--muted:#5d6977;--line:#d5dbe2;--steel:#24486c;--oxide:#b1532c;--hl:#d0021b;
+--display:"Archivo","Arial Narrow",Arial,sans-serif;--body:"Source Sans 3","Segoe UI",Arial,sans-serif;--mono:"JetBrains Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#0f141a;--paper:#161d25;--ink:#e2e8ee;--muted:#98a5b3;--line:#2a3541;--steel:#8db3d9;--oxide:#e08a5f;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.4 var(--body);display:flex;flex-direction:column;
+  padding:calc(10px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));gap:8px;overflow:hidden}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:6px}
+.proj{font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:14px;color:var(--oxide);overflow-wrap:anywhere}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(22px,6.4vw,32px);line-height:1.05;margin:2px 0 0;overflow-wrap:anywhere}
+.lang{display:flex;gap:4px;flex-shrink:0}
+button,.btn{font:600 13px var(--mono);border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:4px;padding:7px 10px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+button[aria-pressed="true"],button[aria-selected="true"]{background:var(--steel);border-color:var(--steel);color:#fff}
+.btn.acc{background:var(--oxide);border-color:var(--oxide);color:#fff}
+.meta{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:15px}
+.meta span{display:inline-flex;gap:6px;align-items:baseline}
+.meta i{font-style:normal;font:700 11px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.bar{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center}
+.tabs,.zoom{display:flex;flex-wrap:wrap;gap:6px}
+.zoom button{min-width:42px;justify-content:center;font-size:16px}
+.stage{position:relative;flex:1;min-height:0;overflow:hidden;background:#fff;border:1px solid var(--line);border-radius:4px;touch-action:none;cursor:grab}
+.box{position:absolute;left:0;top:0;transform-origin:0 0}
+.box img{display:block;width:100%;height:100%;user-select:none;-webkit-user-drag:none;pointer-events:none}
+.hl{position:absolute;border:3px solid var(--hl);background:#d0021b22;border-radius:3px;box-shadow:0 0 0 3px #ffffffcc;pointer-events:none}
+.msg{min-height:1.3em;font-size:14px;color:var(--muted)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <div style="min-width:0"><div class="proj" id="proj"></div><h1 id="title"></h1></div>
+  <div class="lang" role="group" aria-label="Language"><button type="button" data-l="en">EN</button><button type="button" data-l="es">ES</button></div>
+</header>
+<div class="meta" id="meta"></div>
+<div class="bar"><div class="tabs" id="tabs" role="tablist"></div>
+  <div class="zoom"><button type="button" id="minus" aria-label="Zoom out">−</button><button type="button" id="fit"></button><button type="button" id="plus" aria-label="Zoom in">+</button><a class="btn acc" id="v3d" hidden></a></div></div>
+<div class="stage" id="stage"><div class="box" id="box"><img id="img" alt=""><div class="hl" id="hl" hidden></div></div></div>
+<div class="msg" id="msg" aria-live="polite"></div>
+<script>
+const T={en:{fit:'Fit',v3d:'View in 3D',plan:'Drawing',where:'Where it goes',stamp:'Stamp',qty:'Qty',desc:'Description',type:'Type',cls:'Simple / welded',coat:'Paint',len:'Length',loc:'Goes in',unit:'Unit',loading:'Loading…',hint:'Pinch or use + and − to zoom; drag to move.',hintW:'The mark is in the red box. Pinch to zoom.',nf:'This piece is no longer in the list.',err:'Could not open the drawing. Check the connection and scan the QR again.',bad:'Could not open this sheet.',none:'This piece has no drawing.'},
+ es:{fit:'Ajustar',v3d:'Ver en 3D',plan:'Plano',where:'Dónde va',stamp:'Troquel',qty:'Cantidad',desc:'Descripción',type:'Tipo',cls:'Simple / compuesta',coat:'Pintura',len:'Largo',loc:'Va en',unit:'Unidad',loading:'Cargando…',hint:'Pellizca o usa + y − para acercar; arrastra para moverte.',hintW:'La marca está en el recuadro rojo. Pellizca para acercar.',nf:'Esta pieza ya no está en la lista.',err:'No se pudo abrir el plano. Revisa la conexión y vuelve a escanear el QR.',bad:'No se pudo abrir esta hoja.',none:'Esta pieza no tiene plano.'}};
+const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const CLS={Compuesta:'Welded assembly',Simple:'Single piece'};
+let lang=(new URLSearchParams(location.search).get('lang')||'').toLowerCase(); try{ lang=localStorage.getItem('plano.lang')||lang; }catch(e){} if(lang!=='es') lang='en';
+const t=k=>T[lang][k];
+const V={z:1,tx:0,ty:0,iw:0,ih:0,views:[],i:0,pts:new Map(),pinch:null,J:null,it:null,dir:''};
+const apply=()=>{ $('box').style.transform=`translate(${V.tx}px,${V.ty}px) scale(${V.z})`; };
+function fit(){ const S=$('stage').getBoundingClientRect(); if(!V.iw) return; V.z=Math.min(S.width/V.iw,S.height/V.ih); V.tx=(S.width-V.iw*V.z)/2; V.ty=(S.height-V.ih*V.z)/2; apply(); }
+function zoom(f,cx,cy){ const S=$('stage').getBoundingClientRect(); if(cx==null){ cx=S.width/2; cy=S.height/2; } const nz=Math.max(0.05,Math.min(10,V.z*f)); V.tx=cx-(cx-V.tx)*nz/V.z; V.ty=cy-(cy-V.ty)*nz/V.z; V.z=nz; apply(); }
+function show(i){ V.i=i; const w=V.views[i]; if(!w) return;
+  $('tabs').querySelectorAll('button').forEach((b,j)=>b.setAttribute('aria-selected',j===i?'true':'false'));
+  $('msg').textContent=t('loading'); $('hl').hidden=true; const img=$('img');
+  img.onload=()=>{ V.iw=img.naturalWidth; V.ih=img.naturalHeight; $('box').style.width=V.iw+'px'; $('box').style.height=V.ih+'px';
+    const h=$('hl'); if(w.b){ h.style.left=w.b[0]*100+'%'; h.style.top=w.b[1]*100+'%'; h.style.width=w.b[2]*100+'%'; h.style.height=w.b[3]*100+'%'; h.hidden=false; }
+    fit(); if(w.b){ const S=$('stage').getBoundingClientRect(), cx=(w.b[0]+w.b[2]/2)*V.iw, cy=(w.b[1]+w.b[3]/2)*V.ih, z=Math.min(10,Math.max(V.z*3,S.width/(V.iw*0.35))); V.z=z; V.tx=S.width/2-cx*z; V.ty=S.height/2-cy*z; apply(); }
+    $('msg').textContent=w.b?t('hintW'):t('hint'); };
+  img.onerror=()=>{ $('msg').textContent=t('bad'); };
+  img.src=V.dir+w.f; }
+function render(){ document.documentElement.lang=lang;
+  document.querySelectorAll('.lang button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.l===lang?'true':'false'));
+  $('fit').textContent=t('fit'); $('v3d').textContent=t('v3d');
+  const J=V.J, it=V.it; if(!J) return;
+  $('proj').textContent=[J.code,J.proj].filter(Boolean).join(' · ');
+  if(!it){ $('title').textContent=''; $('msg').textContent=t('nf'); return; }
+  $('title').textContent=`${it.s?t('stamp')+' '+it.s+' · ':''}${it.m}`;
+  document.title=`${it.s?it.s+' · ':''}${it.m} — ${J.proj||J.code||t('plan')}`;
+  const kv=[[t('qty'),it.q],[t('desc'),it.d],[t('type'),it.t],[t('cls'),lang==='en'?(CLS[it.k]||it.k):it.k],[t('coat'),it.c],[t('len'),it.L],[t('loc'),it.lc],[t('unit'),it.u]].filter(x=>x[1]!=null&&x[1]!=='');
+  $('meta').innerHTML=kv.map(([k,v])=>`<span><i>${esc(k)}</i>${esc(v)}</span>`).join('');
+  const p=it.p||[], w=it.w||[];
+  V.views=p.map((x,i)=>({f:x.f,tab:t('plan')+(p.length>1?` ${i+1}/${p.length}`:'')})).concat(w.map((x,i)=>({f:x.f,b:x.b,tab:t('where')+(w.length>1?' '+(i+1):'')})));
+  $('tabs').innerHTML=V.views.map((v,i)=>`<button type="button" role="tab" data-i="${i}" aria-selected="${i===V.i}">${esc(v.tab)}</button>`).join('');
+  $('tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>show(+b.dataset.i));
+  const a=$('v3d'); a.hidden=!it.v; if(it.v) a.href=it.v.replace(/([?&])lang=\w+/,'$1lang='+lang);
+  if(!V.views.length) $('msg').textContent=t('none'); }
+document.querySelectorAll('.lang button').forEach(b=>b.onclick=()=>{ lang=b.dataset.l; try{ localStorage.setItem('plano.lang',lang); }catch(e){} render(); });
+(()=>{ const St=$('stage');
+  St.addEventListener('pointerdown',e=>{ St.setPointerCapture(e.pointerId); V.pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); if(V.pts.size===2){ const [a,b]=[...V.pts.values()]; V.pinch={d:Math.hypot(a.x-b.x,a.y-b.y),z:V.z}; } });
+  St.addEventListener('pointermove',e=>{ const p=V.pts.get(e.pointerId); if(!p) return; const R=St.getBoundingClientRect();
+    if(V.pts.size===1){ V.tx+=e.clientX-p.x; V.ty+=e.clientY-p.y; p.x=e.clientX; p.y=e.clientY; apply(); return; }
+    p.x=e.clientX; p.y=e.clientY; const [a,b]=[...V.pts.values()]; if(!V.pinch) return; const d=Math.hypot(a.x-b.x,a.y-b.y); zoom((V.pinch.z*d/V.pinch.d)/V.z,(a.x+b.x)/2-R.left,(a.y+b.y)/2-R.top); });
+  const up=e=>{ V.pts.delete(e.pointerId); if(V.pts.size<2) V.pinch=null; }; St.addEventListener('pointerup',up); St.addEventListener('pointercancel',up);
+  St.addEventListener('wheel',e=>{ e.preventDefault(); const R=St.getBoundingClientRect(); zoom(e.deltaY<0?1.15:1/1.15,e.clientX-R.left,e.clientY-R.top); },{passive:false});
+  St.addEventListener('dblclick',e=>{ const R=St.getBoundingClientRect(); zoom(2.2,e.clientX-R.left,e.clientY-R.top); });
+  $('plus').onclick=()=>zoom(1.4); $('minus').onclick=()=>zoom(1/1.4); $('fit').onclick=fit; addEventListener('resize',fit); })();
+// #CÓDIGO~marca.troquel.unidad  →  ./CÓDIGO/index.json
+(async()=>{ render(); $('msg').textContent=t('loading');
+  const h=decodeURIComponent(location.hash.replace(/^#/,'')), i=h.indexOf('~'); const folder=i>0?h.slice(0,i):'', key=i>0?h.slice(i+1):'';
+  if(!/^[A-Za-z0-9._-]+$/.test(folder)){ $('msg').textContent=t('err'); return; }
+  V.dir='./'+folder+'/';
+  try{ const r=await fetch(V.dir+'index.json',{cache:'no-cache'}); if(!r.ok) throw new Error(r.status); V.J=await r.json(); V.it=V.J.items[key]||null; render(); if(V.it&&V.views.length) show(0); }
+  catch(e){ console.warn(e); $('msg').textContent=t('err'); } })();
+</script>
+</body>
+</html>
