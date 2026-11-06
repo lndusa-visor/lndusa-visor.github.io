@@ -72,7 +72,7 @@ function render(){ document.documentElement.lang=lang;
   const J=V.J, it=V.it; if(!J) return;
   $('proj').textContent=[J.code,J.proj].filter(Boolean).join(' · ');
   if(!it){ $('title').textContent=''; $('msg').textContent=t('nf'); return; }
-  $('title').textContent=`${it.s?t('stamp')+' '+it.s+' · ':''}${it.m}`;
+  $('title').textContent=`${it.s?t('stamp')+' '+it.s+' · ':''}${it.m}`+(V.pc?` · ${V.pc.replace('-',lang==='en'?' of ':' de ')}`:'');
   document.title=`${it.s?it.s+' · ':''}${it.m} — ${J.proj||J.code||t('plan')}`;
   const kv=[[t('qty'),it.q],[t('desc'),it.d],[t('type'),it.t],[t('cls'),lang==='en'?(CLS[it.k]||it.k):it.k],[t('coat'),it.c],[t('len'),it.L],[t('loc'),it.lc],[t('unit'),it.u]].filter(x=>x[1]!=null&&x[1]!=='');
   $('meta').innerHTML=kv.map(([k,v])=>`<span><i>${esc(k)}</i>${esc(v)}</span>`).join('');
@@ -92,12 +92,12 @@ document.querySelectorAll('.lang button').forEach(b=>b.onclick=()=>{ lang=b.data
   St.addEventListener('wheel',e=>{ e.preventDefault(); const R=St.getBoundingClientRect(); zoom(e.deltaY<0?1.15:1/1.15,e.clientX-R.left,e.clientY-R.top); },{passive:false});
   St.addEventListener('dblclick',e=>{ const R=St.getBoundingClientRect(); zoom(2.2,e.clientX-R.left,e.clientY-R.top); });
   $('plus').onclick=()=>zoom(1.4); $('minus').onclick=()=>zoom(1/1.4); $('fit').onclick=fit; addEventListener('resize',fit); })();
-// #CÓDIGO~marca.troquel.unidad  →  ./CÓDIGO/index.json
+// planos/CÓDIGO/#marca~troquel~unidad~1-2  →  ./index.json (la carpeta del proyecto va en la ruta; el escáner de despacho lee el mismo QR)
 (async()=>{ render(); $('msg').textContent=t('loading');
-  const h=decodeURIComponent(location.hash.replace(/^#/,'')), i=h.indexOf('~'); const folder=i>0?h.slice(0,i):'', key=i>0?h.slice(i+1):'';
-  if(!/^[A-Za-z0-9._-]+$/.test(folder)){ $('msg').textContent=t('err'); return; }
-  V.dir='./'+folder+'/';
-  try{ const r=await fetch(V.dir+'index.json',{cache:'no-cache'}); if(!r.ok) throw new Error(r.status); V.J=await r.json(); V.it=V.J.items[key]||null; render(); if(V.it&&V.views.length) show(0); }
+  const parts=decodeURIComponent(location.hash.replace(/^#/,'')).split('~'); let pc='';
+  if(parts.length>3&&/^\d+-\d+$/.test(parts[parts.length-1])) pc=parts.pop(); while(parts.length<3) parts.push('');
+  const key=parts.slice(0,3).join('~'); V.dir='./';
+  try{ const r=await fetch('./index.json',{cache:'no-cache'}); if(!r.ok) throw new Error(r.status); V.J=await r.json(); V.it=V.J.items[key]||null; V.pc=pc; render(); if(V.it&&V.views.length) show(0); }
   catch(e){ console.warn(e); $('msg').textContent=t('err'); } })();
 </script>
 </body>

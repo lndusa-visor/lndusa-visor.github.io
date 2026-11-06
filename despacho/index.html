@@ -143,7 +143,7 @@ const EN={'Despacho':'Shipping','Despacho de piezas':'Piece shipping',
  'Escanear con cámara':'Scan with camera','Descargar Excel':'Download Excel','Piezas escaneadas':'Pieces scanned','Líneas completas':'Lines complete',
  'Peso (lb)':'Weight (lb)','Superficie (ft²)':'Surface (ft²)','Deshacer último':'Undo last','Nuevo despacho':'New shipment','Tocar otra vez para borrar todo':'Tap again to clear all',
  'Los escaneos se guardan en este teléfono hasta que empieces un nuevo despacho.':'Scans are saved on this phone until you start a new shipment.',
- 'Cerrar cámara':'Close camera','OK':'OK','Ya se despacharon todas':'All already shipped','No está en la lista':'Not in the list','Otro proyecto':'Other project',
+ 'Cerrar cámara':'Close camera','OK':'OK','Ya se despacharon todas':'All already shipped','No está en la lista':'Not in the list','Otro proyecto':'Other project','Esta pieza ya se escaneó':'This piece was already scanned',
  'FECHA':'DATE','HORA':'TIME','CAMIÓN / REMISIÓN':'TRUCK / DELIVERY NOTE','ESTADO':'STATUS','QR':'QR','#':'#','DESPACHADO':'SHIPPED','PENDIENTE':'PENDING','HOJA':'SHEET',
  'líneas':'lines','piezas':'pieces','No se encontró una lista de troquelados en ese Excel (hoja con columnas STAMP y MARK).':'No stamp list found in that Excel (sheet with STAMP and MARK columns).',
  'No se pudo abrir la cámara.':'Could not open the camera.','Escaneado':'Scanned','Total despachado':'Total shipped','Proyecto':'Project','Fecha':'Date',
@@ -222,7 +222,7 @@ $('file').onchange=async e=>{const f=e.target.files[0]; if(!f) return; e.target.
   try{ const sh=await readXlsx(await f.arrayBuffer()); const l=parseList(sh,f.name); if(!l){ show('bad',t('No se encontró una lista de troquelados en ese Excel (hoja con columnas STAMP y MARK).')); return; }
     if(L&&S.length&&L.project!==l.project){ S=[]; save(); }
     L=l; LS.set('desp:list',L); IDB.put('imgs',[...IMG.entries()]);
-    const old=S; S=[]; old.forEach(x=>{ const q=parse(x.code); let li=-1, st;
+    const old=S; S=[]; old.forEach(x=>{ if(x.status==='dup'){ S.push(x); return; } const q=parse(x.code); let li=-1, st;
       if(q.proj&&L.project&&q.proj!==L.project) st='bad-proj'; else { li=find(q); st=li<0?'bad':(shipped(li)>=L.lines[li].qty?'warn':'ok'); }
       S.push({...x,li,status:st}); }); save(); render(); $('gun').focus();
   }catch(err){ console.error(err); show('bad',String(err.message||err)); }};
@@ -230,7 +230,9 @@ $('file').onchange=async e=>{const f=e.target.files[0]; if(!f) return; e.target.
 /* ---------- escanear ---------- */
 function parse(code){ code=String(code||'').trim(); const h=code.indexOf('#'); const body=h>=0?code.slice(h+1):code;
   let proj=''; const m=/\/(US\.\d{3}(?:\.\d+)?)\//i.exec(code); if(m) proj=m[1].toUpperCase();
-  const p=decodeURIComponent(body.replace(/\+/g,' ')).split('~'); return {proj,mk:up(p[0]||''),st:up(p[1]||''),unit:p[2]||''}; }
+  const p=decodeURIComponent(body.replace(/\+/g,' ')).split('~'); const pc=/^\d+-\d+$/.test(p[3]||'')?p[3]:''; return {proj,mk:up(p[0]||''),st:up(p[1]||''),unit:p[2]||'',pc}; }
+// la misma pieza (QR «1 de 2») no se cuenta dos veces
+const pieceKey=p=>p.pc?[p.proj,p.mk,p.st,p.unit,p.pc].join('|'):'';
 const shipped=li=>S.filter(s=>s.li===li).length;
 function find(p){ if(!L) return -1; const idx=[]; L.lines.forEach((l,i)=>{ if(l.mk===p.mk&&(!p.st||l.st===p.st)) idx.push(i); });
   if(!idx.length&&p.st) L.lines.forEach((l,i)=>{ if(l.st===p.st&&!idx.includes(i)) idx.push(i); });
@@ -240,7 +242,8 @@ let lastCode='',lastAt=0;
 function scan(code,fromCam){
   code=String(code||'').trim(); if(!code||!L) return null; const now=Date.now();
   if(fromCam&&code===lastCode&&now-lastAt<2500) return null; lastCode=code; lastAt=now;
-  const p=parse(code); let li=-1, status;
+  const p=parse(code); let li=-1, status; const pk=pieceKey(p);
+  if(pk&&S.some(s=>s.status!=='dup'&&pieceKey(parse(s.code))===pk)){ const txt=t('Esta pieza ya se escaneó')+' — '+(p.st||p.mk)+' · '+p.pc.replace('-',' '+t('de')+' '); S.push({ts:now,truck,code,li:-1,status:'dup'}); save(); render(); show('warn',txt,code); feedback('warn'); return {cls:'warn',txt}; }
   if(p.proj&&L.project&&p.proj!==L.project) status='bad-proj'; else { li=find(p); status=li<0?'bad':(shipped(li)>=L.lines[li].qty?'warn':'ok'); }
   S.push({ts:now,truck,code,li,status}); save(); render();
   const l=li>=0?L.lines[li]:null, desc=l?[l.st,l.mk.replace(/^.*?[-_]?(?=[^-_]*$)/,''),l.v[L.headers.find(h=>kind(h)==='desc')]||''].filter(Boolean).join(' · '):p.mk;
@@ -304,7 +307,7 @@ function qrMx(text){ const q=qrcode(0,'M'); q.addData(unescape(encodeURIComponen
 function qrPng(text,px){ const k=text+'|'+px; if(qrCache.has(k)) return qrCache.get(k); const q=qrMx(text), qz=2, n=q.size+2*qz, s=Math.max(1,Math.floor(px/n)); const c=document.createElement('canvas'); c.width=c.height=n*s;
   const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.fillStyle='#000'; for(let r=0;r<q.size;r++) for(let cc=0;cc<q.size;cc++) if(q.get(r,cc)) g.fillRect((cc+qz)*s,(r+qz)*s,s,s);
   const u=c.toDataURL('image/png'); qrCache.set(k,u); return u; }
-const stTxt=s=>s==='ok'?t('OK'):s==='warn'?t('Ya se despacharon todas'):s==='bad-proj'?t('Otro proyecto'):t('No está en la lista');
+const stTxt=s=>s==='dup'?t('Esta pieza ya se escaneó'):s==='ok'?t('OK'):s==='warn'?t('Ya se despacharon todas'):s==='bad-proj'?t('Otro proyecto'):t('No está en la lista');
 const stCls=s=>s==='ok'?'st-ok':s==='warn'?'st-warn':'st-bad';
 function totals(){ let w=0,a=0; S.forEach(s=>{ if(s.li>=0&&s.status!=='bad-proj'){ const l=L.lines[s.li]; w+=l.wt; a+=l.sa; } });
   const done=L?L.lines.filter((l,i)=>shipped(i)>=l.qty).length:0; return {w,a,done}; }
