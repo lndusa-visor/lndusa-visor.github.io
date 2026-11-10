@@ -164,7 +164,7 @@ let truck=LS.get('desp:truck')||'';
 const save=()=>{LS.set('desp:scans',S);};
 
 /* ---------- leer Excel de troquelados ---------- */
-const HDR=[['stamp',/^(STAMP|TROQUEL)/],['sno',/^(S\.?\s*NO|NO\.?$|#)/],['mark',/^(MARK|MARCA)/],['qty',/^(QTY|CANT)/],['desc',/^(DESCRIP)/],
+const HDR=[['stamp',/^(STAMP|TROQUEL|SPOOL)/],['sno',/^(S\.?\s*NO|NO\.?$|#)/],['mark',/^(MARK|MARCA|PIEZA|PIECE)/],['qty',/^(QTY|CANT)/],['desc',/^(DESCRIP)/],
   ['tipo2',/^(SIMPLE|WELDED|COMPU)/],['tipo',/^(TIPO|TYPE)$/],['coat',/^(COATING|GRADE|RECUBR)/],['len',/^(LENGTH|LARGO|LONG)/],['wt',/^(WEIGHT|PESO)/],['sa',/^(SURFACE|SUPERF)/],['dwg',/^(DRAWING|DIBUJO|PLANO|QR)/]];
 const kind=h=>{const u=String(h||'').trim().toUpperCase();for(const [k,re] of HDR) if(re.test(u)) return k;return null;};
 function colIdx(ref){const m=/^([A-Z]+)/.exec(ref);let n=0;for(const c of m[1]) n=n*26+c.charCodeAt(0)-64;return n-1;}
@@ -200,7 +200,7 @@ function parseList(sheets,file){ IMG.clear();
     sh.rows.slice(0,6).forEach(r=>(r||[]).forEach(v=>{const m=/\b(US\.?\d{3}(?:\.\d+)?)\b/i.exec(String(v||''));if(m&&!project) project=m[1].toUpperCase().replace(/^US(\d)/,'US.$1');
       const n=/^(.*?)\s+[—-]\s+(LISTA DE TROQUELADOS|STAMP LIST)/i.exec(String(v||''));if(n&&!name) name=n[1].trim();}));
     let hi=-1,map=null;
-    for(let i=0;i<Math.min(sh.rows.length,15);i++){const r=sh.rows[i]||[];const ks=r.map(kind);if(ks.includes('mark')&&ks.includes('stamp')&&ks.includes('qty')){hi=i;map=r;break;}}
+    for(let i=0;i<Math.min(sh.rows.length,15);i++){const r=sh.rows[i]||[];const ks=r.map(kind);if(ks.includes('mark')&&ks.includes('stamp')){hi=i;map=r;break;}}
     if(hi<0) return;
     const H=map.map((h,ci)=>({h:String(h??'').trim(),k:kind(h),ci})).filter(x=>x.h&&x.k!=='dwg');
     if(!headers) headers=H.map(x=>x.h);
